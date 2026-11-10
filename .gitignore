@@ -1,29 +1,74 @@
-# Python
+# ==========================================================
+# .gitignore cho Project GUI (Python / PySide6 / PyQt6)
+# ==========================================================
+
+# 1. Python bytecode & cache
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+*.pyd
 
-# Virtual environments and local environment files
+# 2. Môi trường ảo (Virtual Environments & Conda)
 .venv/
 venv/
 env/
+ENV/
+.conda/
+conda-meta/
+qt_env/
 .env
 .env.*
 !.env.example
 
-# Build and packaging
+# 3. Qt / PySide6 / PyQt6 / Qt Designer & Qt Creator
+*.ui~
+*.ui.bak
+*.pro.user
+*.pro.user.*
+*.qmake.stash
+*.qmlc
+*.jsc
+.qtcreator/
+.qtc_clangd/
+
+# 4. Build, đóng gói phần mềm (PyInstaller, Nuitka, cx_Freeze, pip)
 build/
 dist/
 *.egg-info/
+.eggs/
+wheels/
+*.spec
+*.manifest
+*.build/
+*.dist/
+*.onefile-build/
 
-# Test and tooling caches
+# 5. Test, linter & coverage caches
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
 
-# Editor and operating-system files
+# 6. Logs, dữ liệu tạm & cơ sở dữ liệu cục bộ
+*.log
+logs/
+*.tmp
+*.bak
+*.swp
+*~
+*.sqlite
+*.sqlite3
+*.db
+
+# 7. IDE, Editor & Hệ điều hành (Windows / Ubuntu Linux / macOS)
+.vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+.Trash-*
