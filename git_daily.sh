@@ -47,8 +47,8 @@ Các lệnh dùng thường xuyên (Quy trình hằng ngày trên cả hai máy 
   pull         | -p    [Đầu ngày / Chuyển máy] Kiểm tra sạch & pull --ff-only
   branch       | -b    Đảm bảo đang ở nhánh '$DEFAULT_BRANCH' và đối chiếu SHA với origin
   start        | --start Chạy gộp 'branch' + 'pull' để sẵn sàng làm việc đầu ngày
-  pull-discard | -d    [TH1] Vứt bỏ toàn bộ code sửa nháp (kể cả commit nháp chưa push)
-                       ở máy này và lấy lại bản chuẩn 100% từ GitHub
+  pull-discard | -d    [TH1] Vứt bỏ toàn bộ code sửa nháp (kể cả file đã git add hoặc
+                       commit nháp chưa push) và lấy lại bản chuẩn 100% từ GitHub
   pull-keep    | -k    [TH2] Quên pull mà đã sửa code: tự động stash -> pull bản mới
                        nhất từ GitHub -> lấy lại (stash pop) phần code vừa sửa
   push-all     | -a    Stage toàn bộ thay đổi trong project, commit và push lên GitHub
@@ -80,6 +80,11 @@ require_git() {
 }
 
 ensure_repo_config() {
+    # Tự động chuẩn hóa LF cho chính file git_daily.sh nếu bị Windows chuyển thành CRLF
+    if [[ -f "$ROOT_DIR/git_daily.sh" ]] && LC_ALL=C grep -q $'\r' "$ROOT_DIR/git_daily.sh" 2>/dev/null; then
+        sed -i 's/\r$//' "$ROOT_DIR/git_daily.sh" 2>/dev/null || true
+    fi
+
     # Thử thêm safe.directory vào global config nếu có quyền ghi
     git config --global --get-all safe.directory 2>/dev/null | grep -Fxq "$ROOT_DIR" ||
         git config --global --add safe.directory "$ROOT_DIR" 2>/dev/null || true
@@ -106,11 +111,37 @@ require_origin() {
     fi
 }
 
+has_head_commit() {
+    git_repo rev-parse --verify HEAD >/dev/null 2>&1
+}
+
+has_remote_branch() {
+    local branch="${1:-$DEFAULT_BRANCH}"
+    git_repo show-ref --verify --quiet "refs/remotes/origin/$branch"
+}
+
 current_branch() {
     local branch
-    branch="$(git_repo branch --show-current)"
+    branch="$(git_repo branch --show-current 2>/dev/null || true)"
+    if [[ -z "$branch" ]]; then
+        branch="$(git_repo symbolic-ref --short HEAD 2>/dev/null || true)"
+    fi
     [[ -n "$branch" ]] || err "Đang ở trạng thái detached HEAD; hãy chạy: ./git_daily.sh branch"
     printf '%s' "$branch"
+}
+
+# Kiểm tra xem nhánh hiện tại có commit nào ở local chưa được push lên origin hay không
+# (tương đương Test-HasUnpushedCommits trong git_daily.ps1, xử lý đúng cả lần push đầu tiên)
+has_unpushed_commits() {
+    local branch="${1:-$(current_branch)}"
+    has_head_commit || return 1
+
+    # Nếu nhánh trên origin chưa tồn tại nhưng local đã có commit (HEAD) -> cần push
+    if ! has_remote_branch "$branch"; then
+        return 0
+    fi
+
+    [[ -n "$(git_repo log "origin/$branch..HEAD" --oneline 2>/dev/null)" ]]
 }
 
 # ------------------------------------------------------------------------------
@@ -163,24 +194,27 @@ cmd_status() {
     printf '\n'
 
     info "=== 2. Commit gần nhất & Đối chiếu SHA ==="
-    if git_repo rev-parse --verify HEAD >/dev/null 2>&1; then
-        local local_sha origin_sha branch
-        branch="$(git_repo branch --show-current)"
+    if has_head_commit; then
+        local local_sha origin_sha branch target_remote_branch
+        branch="$(git_repo branch --show-current 2>/dev/null || true)"
+        target_remote_branch="${branch:-$DEFAULT_BRANCH}"
         local_sha="$(git_repo rev-parse HEAD)"
         git_repo log -n 1 --oneline --decorate
         printf '  - SHA tại máy này (HEAD)         : %s (%s)\n' "$local_sha" "${branch:-detached HEAD}"
 
-        if git_repo rev-parse --verify "origin/$DEFAULT_BRANCH" >/dev/null 2>&1; then
-            origin_sha="$(git_repo rev-parse "origin/$DEFAULT_BRANCH")"
-            printf '  - SHA đã biết của origin/%-7s : %s\n' "$DEFAULT_BRANCH" "$origin_sha"
+        if has_remote_branch "$target_remote_branch"; then
+            origin_sha="$(git_repo rev-parse "origin/$target_remote_branch")"
+            printf '  - SHA đã biết của origin/%-7s : %s\n' "$target_remote_branch" "$origin_sha"
             if [[ "$local_sha" == "$origin_sha" ]]; then
-                ok "SHA local trùng khớp với origin/$DEFAULT_BRANCH."
+                ok "SHA local trùng khớp với origin/$target_remote_branch."
             else
-                warn "SHA local KHÁC với origin/$DEFAULT_BRANCH (hãy chạy './git_daily.sh pull' hoặc './git_daily.sh push')."
+                warn "SHA local KHÁC với origin/$target_remote_branch (hãy chạy './git_daily.sh pull' hoặc './git_daily.sh push')."
             fi
+        else
+            warn "Nhánh 'origin/$target_remote_branch' chưa có trên remote (hoặc chưa fetch/push lần đầu)."
         fi
     else
-        warn "Chưa có commit nào trong repository."
+        warn "Chưa có commit nào trong repository (HEAD chưa khởi tạo)."
     fi
 
     printf '\n'
@@ -204,18 +238,28 @@ cmd_branch() {
 
     if git_repo show-ref --verify --quiet "refs/heads/$DEFAULT_BRANCH"; then
         git_repo switch "$DEFAULT_BRANCH"
-    else
+    elif has_remote_branch "$DEFAULT_BRANCH"; then
         info "Tạo tracking branch '$DEFAULT_BRANCH' từ 'origin/$DEFAULT_BRANCH'..."
         git_repo switch -c "$DEFAULT_BRANCH" --track "origin/$DEFAULT_BRANCH"
+    else
+        info "Chưa có commit trên cả local và origin; đặt nhánh mặc định là '$DEFAULT_BRANCH'..."
+        git_repo symbolic-ref HEAD "refs/heads/$DEFAULT_BRANCH"
     fi
 
-    local local_sha origin_sha
-    local_sha="$(git_repo rev-parse HEAD)"
-    if git_repo show-ref --verify --quiet "refs/remotes/origin/$DEFAULT_BRANCH"; then
-        origin_sha="$(git_repo rev-parse "origin/$DEFAULT_BRANCH")"
+    if has_head_commit; then
+        local local_sha
+        local_sha="$(git_repo rev-parse HEAD)"
         printf '  - SHA local (%s)        : %s\n' "$DEFAULT_BRANCH" "$local_sha"
+    else
+        warn "Nhánh local '$DEFAULT_BRANCH' chưa có commit đầu tiên."
+    fi
+
+    if has_remote_branch "$DEFAULT_BRANCH"; then
+        local origin_sha
+        origin_sha="$(git_repo rev-parse "origin/$DEFAULT_BRANCH")"
         printf '  - SHA origin/%-12s : %s\n' "$DEFAULT_BRANCH" "$origin_sha"
     fi
+
     ok "Đang ở nhánh '$DEFAULT_BRANCH'."
 }
 
@@ -241,12 +285,17 @@ cmd_pull() {
 
     info "Đang chạy: git pull --ff-only origin $branch..."
     if git_repo ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+        git_repo fetch origin "$branch"
         git_repo pull --ff-only origin "$branch"
-        local local_sha origin_sha
-        local_sha="$(git_repo rev-parse HEAD)"
-        origin_sha="$(git_repo rev-parse "origin/$branch")"
-        printf '  - SHA local (%s)  : %s\n' "$branch" "$local_sha"
-        printf '  - SHA origin/%s : %s\n' "$branch" "$origin_sha"
+        git_repo branch --set-upstream-to="origin/$branch" "$branch" >/dev/null 2>&1 || true
+
+        if has_head_commit && has_remote_branch "$branch"; then
+            local local_sha origin_sha
+            local_sha="$(git_repo rev-parse HEAD)"
+            origin_sha="$(git_repo rev-parse "origin/$branch")"
+            printf '  - SHA local (%s)  : %s\n' "$branch" "$local_sha"
+            printf '  - SHA origin/%s : %s\n' "$branch" "$origin_sha"
+        fi
         ok "Cập nhật đầu ngày hoàn tất! Code tại máy này đã đồng bộ chuẩn với GitHub."
     else
         warn "Nhánh '$branch' chưa tồn tại trên remote origin (có thể chưa push lần đầu)."
@@ -256,18 +305,21 @@ cmd_pull() {
 # ------------------------------------------------------------------------------
 # TRƯỜNG HỢP 1: Vứt bỏ toàn bộ code sửa nháp (không hợp lý) và pull lại bản chuẩn
 #   Tương đương:
-#     git restore . && git clean -fd
-#     git fetch origin && git reset --hard origin/main
+#     git restore --staged --worktree . && git clean -fd
+#     git fetch origin && git switch -f main && git reset --hard origin/main
 #     ./git_daily.sh pull
 # ------------------------------------------------------------------------------
 cmd_pull_discard() {
     require_repo
     require_origin
 
-    warn "[TH1] CẢNH BÁO: Thao tác này sẽ XÓA BỎ toàn bộ các sửa đổi nháp (kể cả commit nháp chưa push) trên máy hiện tại để quay về đúng bản chuẩn trên GitHub!"
+    warn "[TH1] CẢNH BÁO: Thao tác này sẽ XÓA BỎ toàn bộ các sửa đổi nháp (kể cả file đã git add và commit nháp chưa push) trên máy hiện tại để quay về đúng bản chuẩn trên GitHub!"
     if [[ "${1:-}" != "-y" && "${1:-}" != "--yes" ]]; then
-        local confirm
-        read -r -p "Bạn có chắc chắn muốn vứt bỏ thay đổi và pull lại? (gõ 'y' để đồng ý): " confirm
+        if [[ ! -t 0 ]]; then
+            err "Chế độ không tương tác: hãy truyền thêm cờ '-y' (ví dụ: ./git_daily.sh pull-discard -y)."
+        fi
+        local confirm=""
+        read -r -p "Bạn có chắc chắn muốn vứt bỏ thay đổi và pull lại? (gõ 'y' để đồng ý): " confirm || true
         if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
             info "Đã hủy thao tác."
             exit 0
@@ -275,19 +327,28 @@ cmd_pull_discard() {
     fi
 
     info "[TH1] 1. Tải thông tin mới nhất từ GitHub (git fetch origin)..."
-    git_repo fetch origin
+    git_repo fetch origin --prune
 
-    info "[TH1] 2. Xóa các thay đổi nháp và file nháp mới tạo (git restore . && git clean -fd)..."
-    git_repo restore .
+    if ! has_remote_branch "$DEFAULT_BRANCH"; then
+        err "Trên GitHub chưa có nhánh 'origin/$DEFAULT_BRANCH' để khôi phục về bản chuẩn."
+    fi
+
+    info "[TH1] 2. Bỏ stage và xóa toàn bộ thay đổi/file nháp (git restore --staged --worktree . && git clean -fd)..."
+    if has_head_commit; then
+        git_repo restore --staged --worktree .
+    else
+        git_repo rm -rf --cached . >/dev/null 2>&1 || true
+    fi
     git_repo clean -fd
 
     info "[TH1] 3. Đưa nhánh '$DEFAULT_BRANCH' về đúng bản chuẩn trên GitHub (git reset --hard origin/$DEFAULT_BRANCH)..."
     if git_repo show-ref --verify --quiet "refs/heads/$DEFAULT_BRANCH"; then
-        git_repo switch "$DEFAULT_BRANCH"
+        git_repo switch -f "$DEFAULT_BRANCH"
     else
-        git_repo switch -c "$DEFAULT_BRANCH" --track "origin/$DEFAULT_BRANCH"
+        git_repo switch -f -c "$DEFAULT_BRANCH" --track "origin/$DEFAULT_BRANCH"
     fi
     git_repo reset --hard "origin/$DEFAULT_BRANCH"
+    git_repo clean -fd
 
     info "[TH1] 4. Kiểm tra đồng bộ lại với GitHub..."
     cmd_pull
@@ -309,6 +370,9 @@ cmd_pull_keep() {
 
     local stashed=0
     if [[ -n "$(git_repo status --porcelain)" ]]; then
+        if ! has_head_commit; then
+            err "Repository local chưa có commit đầu tiên (HEAD chưa tồn tại) nên không thể chạy git stash. Hãy commit hoặc backup file thủ công trước."
+        fi
         local stash_msg="auto-stash-gui-$(date +%Y%m%d_%H%M%S)"
         info "[TH2] 1. Đang cất tạm (stash -u) các thay đổi đang sửa ($stash_msg)..."
         git_repo stash push -u -m "$stash_msg"
@@ -354,7 +418,7 @@ cmd_push_all() {
         info "Đang push lên origin/$branch..."
         git_repo push -u origin "$branch"
         ok "Hoàn tất commit và push toàn bộ project lên GitHub (origin/$branch)!"
-    elif [[ -n "$(git_repo log "origin/$branch..HEAD" --oneline 2>/dev/null)" ]]; then
+    elif has_unpushed_commits "$branch"; then
         info "Không có file mới cần commit, đang push các commit có sẵn ở local lên origin/$branch..."
         git_repo push -u origin "$branch"
         ok "Push hoàn tất lên origin/$branch!"
@@ -375,27 +439,42 @@ cmd_push_gui() {
 
     info "Đang kiểm tra thay đổi trong nhóm file giao diện (${APP_DIRS[*]})..."
     local existing_paths=()
+    local staged_gui_paths=()
     local item
     for item in "${APP_DIRS[@]}"; do
-        [[ -e "$ROOT_DIR/$item" ]] && existing_paths+=("$item")
+        if [[ -e "$ROOT_DIR/$item" ]] || [[ -n "$(git_repo ls-files -- "$item" 2>/dev/null)" ]]; then
+            existing_paths+=("$item")
+        fi
     done
 
-    if [[ ${#existing_paths[@]} -gt 0 ]]; then
-        git_repo add "${existing_paths[@]}"
+    if [[ ${#existing_paths[@]} -eq 0 ]]; then
+        warn "Không tìm thấy đường dẫn giao diện nào (${APP_DIRS[*]}) trong project."
+        return 0
     fi
 
-    if ! git_repo diff --cached --quiet; then
-        git_repo status -s "${existing_paths[@]}"
-        git_repo commit -m "$msg"
+    git_repo add -A -- "${existing_paths[@]}"
+
+    for item in "${existing_paths[@]}"; do
+        if ! git_repo diff --cached --quiet -- "$item"; then
+            staged_gui_paths+=("$item")
+        fi
+    done
+
+    if [[ ${#staged_gui_paths[@]} -gt 0 ]]; then
+        git_repo status -s -- "${staged_gui_paths[@]}"
+        printf '\n'
+        git_repo diff --cached --stat -- "${staged_gui_paths[@]}"
+        printf '\n'
+        git_repo commit -m "$msg" -- "${staged_gui_paths[@]}"
         info "Đang push lên origin/$branch..."
         git_repo push -u origin "$branch"
-        ok "Đã commit và push code giao diện (${existing_paths[*]}) thành công!"
-    elif [[ -n "$(git_repo log "origin/$branch..HEAD" --oneline 2>/dev/null)" ]]; then
+        ok "Đã commit và push code giao diện (${staged_gui_paths[*]}) thành công!"
+    elif has_unpushed_commits "$branch"; then
         info "Đang push các commit có sẵn ở local lên origin/$branch..."
         git_repo push -u origin "$branch"
         ok "Push hoàn tất!"
     else
-        info "Không có thay đổi nào trong (${existing_paths[*]}) để commit."
+        info "Không có thay đổi nào trong (${existing_paths[*]}) để commit hoặc push."
     fi
 }
 
@@ -426,15 +505,15 @@ cmd_commit() {
     if [[ -z "$message" ]]; then
         if [[ -t 0 ]]; then
             printf '\n'
-            read -r -p "Nhập nội dung commit: " message
+            read -r -p "Nhập nội dung commit: " message || true
         fi
         [[ -n "$message" ]] || err 'Thiếu nội dung commit. Ví dụ: ./git_daily.sh commit "Cập nhật giao diện"'
     fi
 
     if [[ "$auto_yes" == false && -t 0 ]]; then
-        local confirm
+        local confirm=""
         printf '\n'
-        read -r -p "Tạo commit với nội dung \"$message\"? [y/N]: " confirm
+        read -r -p "Tạo commit với nội dung \"$message\"? [y/N]: " confirm || true
         if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
             info "Đã hủy commit; các file vẫn đang được stage."
             return 0
@@ -454,6 +533,8 @@ cmd_push() {
         return 0
     fi
 
+    has_head_commit || err "Chưa có commit nào trong repository để push. Hãy chạy './git_daily.sh commit' hoặc './git_daily.sh push-all \"nội dung\"' trước."
+
     local branch
     branch="$(current_branch)"
     info "Đang đẩy nhánh '$branch' lên origin..."
@@ -468,14 +549,17 @@ cmd_diff() {
     require_repo
     if git_repo diff --quiet && git_repo diff --cached --quiet; then
         info "Không có thay đổi nào so với commit gần nhất."
-    else
+    elif has_head_commit; then
         git_repo diff HEAD
+    else
+        git_repo diff --cached
+        git_repo diff
     fi
 }
 
 cmd_log() {
     require_repo
-    if git_repo rev-parse --verify HEAD >/dev/null 2>&1; then
+    if has_head_commit; then
         info "Lịch sử commit gần đây:"
         git_repo log --oneline --graph --decorate -n 15
     else
