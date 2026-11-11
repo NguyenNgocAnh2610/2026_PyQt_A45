@@ -1,0 +1,20 @@
+﻿/* Inherits common.qss from QApplication. Only login-specific overrides. */
+QWidget#loginRoot { background: #0b1220; }
+QWidget#loginRoot QLabel { background: transparent; }
+QWidget#loginRoot QLabel#brandMark { color: #e2f7ff; font-size: 18px; font-weight: 800; }
+QWidget#loginRoot QLabel#eyebrow { color: #74e4f4; font-size: 11px; font-weight: 700; }
+QWidget#loginRoot QLabel#brandHeadline { color: #ffffff; font-size: 31px; font-weight: 800; margin-top: 8px; }
+QWidget#loginRoot QLabel#brandDescription { color: #cfddf0; font-size: 14px; }
+QWidget#loginRoot QLabel#brandFeature { color: #e3f9ff; font-size: 12px; font-weight: 600; padding: 5px 0; }
+QWidget#loginRoot QLabel#brandFooter { color: #a7c1dc; font-size: 10px; }
+QWidget#loginRoot QFrame#formPanel { background: #121e30; border: 1px solid #293950; border-top-right-radius: 20px; border-bottom-right-radius: 20px; }
+QWidget#loginRoot QLabel#logoLabel { color: #54cfe7; font-size: 58px; font-weight: 800; }
+QWidget#loginRoot QLabel#loginTitle { color: #f5f8ff; font-size: 27px; font-weight: 800; }
+QWidget#loginRoot QLabel#loginSubtitle { color: #98aac2; }
+QWidget#loginRoot QLabel#fieldLabel { color: #bac7da; font-size: 11px; font-weight: 700; margin-bottom: 3px; }
+QWidget#loginRoot QLineEdit#loginInput { padding: 12px 14px; min-height: 23px; }
+QWidget#loginRoot QCheckBox#rememberCheck { font-size: 11px; }
+QWidget#loginRoot QPushButton#textButton { font-size: 11px; }
+QWidget#loginRoot QPushButton#primaryButton { min-height: 30px; padding: 10px 16px; }
+QWidget#loginRoot QLabel#statusLabel { font-size: 11px; min-height: 18px; }
+QWidget#loginRoot QLabel#formFooter { color: #7d91aa; font-size: 10px; }

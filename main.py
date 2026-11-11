@@ -1,26 +1,36 @@
+"""Demo entry point; production authentication is not configured."""
 import sys
 
-from PySide6.QtWidgets import QApplication, QMainWindow, QLabel
-from PySide6.QtCore import Qt
-from src.ui.login import LoginWindow
+from PySide6.QtWidgets import QApplication
 
-from pathlib import Path
+from src.common.config import APP_NAME, APP_VERSION
+from src.common.styles import apply_theme
+from src.ui.main_window import MainWindow
+from src.ui.widgets.login_page import LoginPage
 
-def main():
+
+def demo_authenticate(username: str, password: str) -> bool:
+    """Preview only; replace with a backend API for production."""
+    return username == "admin" and password == "123456"
+
+
+def main() -> int:
     app = QApplication(sys.argv)
+    app.setApplicationName(APP_NAME)
+    app.setApplicationVersion(APP_VERSION)
+    apply_theme(app)
+    login = LoginPage(authenticate=demo_authenticate)
+    login.setWindowTitle(f"{APP_NAME} | Đăng nhập — DEMO")
 
-    qss_path = Path(__file__).parent / "assets" / "dark.qss"
+    def open_workspace(username: str) -> None:
+        app.main_window = MainWindow(username)
+        app.main_window.show()
+        login.close()
 
-    with open(qss_path) as f:
-        app.setStyleSheet(f.read())
+    login.login_success.connect(open_workspace)
+    login.show()
+    return app.exec()
 
-    login_window = LoginWindow()
-
-    login_window.login_successful.connect(lambda: print("Login successful!"))
-
-    login_window.show()
-
-    sys.exit(app.exec())
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
