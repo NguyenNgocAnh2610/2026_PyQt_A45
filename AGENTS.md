@@ -73,3 +73,16 @@ Cấu trúc dưới đây gồm phần đã triển khai và định hướng m�
 - Không tự ý đổi giao thức, địa chỉ thanh ghi, baudrate hoặc giả định trạng thái thiết bị; những thông số chưa có phải để cấu hình/TODO rõ ràng.
 - Sau thay đổi, nêu file đã sửa, cách chạy thử và giới hạn chưa kiểm chứng.
 
+## Điều phối Codex và Antigravity
+- Skill dùng thử được lưu trong dự án tại
+  [skills/agy-orchestrator/SKILL.md](skills/agy-orchestrator/SKILL.md).
+  Đọc skill này khi điều phối agy thực hiện tính năng hoặc sửa lỗi.
+- Codex phụ trách thiết kế, giao việc cho `agy` CLI và nghiệm thu; có thể trực
+  tiếp xử lý phần phức tạp hoặc tiếp quản khi `agy` không khả dụng/hết quota.
+- Khi nhận task mới, đọc [quy trình điều phối](orchestration/README.md),
+  [hiện trạng](orchestration/PROJECT_CONTEXT.md) và [tiến độ](orchestration/PROGRESS.md).
+- File giao việc hiện tại là `orchestration/task_for_agy.md`; chỉ thực thi khi
+  Codex điền yêu cầu cụ thể và chuyển trạng thái sang Sẵn sàng. Xác minh cú pháp
+  CLI bằng help thực tế; Codex tự review và chạy kiểm thử trong `qt_env`.
+- Tài liệu điều phối không thay thế các nguyên tắc kỹ thuật trong AGENTS.md.
+

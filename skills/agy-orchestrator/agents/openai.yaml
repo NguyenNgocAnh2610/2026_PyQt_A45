@@ -1,0 +1,4 @@
+interface:
+  display_name: "AGY Orchestrator"
+  short_description: "Điều phối agy triển khai, review và kiểm thử dự án"
+  default_prompt: "Dùng $agy-orchestrator để phân tích yêu cầu, giao agy triển khai và nghiệm thu theo hướng dẫn của dự án hiện tại."

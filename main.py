@@ -1,9 +1,10 @@
 """Demo entry point; production authentication is not configured."""
 import sys
 
+from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication
 
-from src.common.config import APP_NAME, APP_VERSION
+from src.common.config import APP_NAME, APP_VERSION, SETTINGS_ORGANIZATION
 from src.common.styles import apply_theme
 from src.ui.main_window import MainWindow
 from src.ui.widgets.login_page import LoginPage
@@ -19,8 +20,11 @@ def main() -> int:
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(APP_VERSION)
     apply_theme(app)
-    login = LoginPage(authenticate=demo_authenticate)
-    login.setWindowTitle(f"{APP_NAME} | Đăng nhập — DEMO")
+    login = LoginPage(
+        authenticate=demo_authenticate,
+        settings=QSettings(SETTINGS_ORGANIZATION, APP_NAME),
+    )
+    login.setWindowTitle(f"{login.windowTitle()} - DEMO")
 
     def open_workspace(username: str) -> None:
         app.main_window = MainWindow(username)
