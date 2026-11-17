@@ -1,0 +1,1 @@
+Create `.agent-orchestrator/tasks/T-XXX.md` only when delegation needs a written task brief. Task specs may be committed; avoid secrets, large output, and duplicate progress logs. `PROGRESS.md` remains the authoritative progress journal.

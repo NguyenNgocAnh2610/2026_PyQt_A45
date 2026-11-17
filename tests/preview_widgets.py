@@ -44,10 +44,10 @@ PAGE_PREVIEWS = (
         "page = create_preview()  # Sau khi đã tạo QApplication và nạp theme",
     ),
     PagePreview(
-        "Cửa sổ chính", None, create_main_preview,
+        "Cửa sổ chính", "main.qss", create_main_preview,
         "src/ui/main_window.py",
         "python -m tests.preview_main\n\n"
-        "Dữ liệu demo; chưa kết nối phần cứng. Nút Đóng chỉ đóng preview này.\n"
+        "Ba chế độ mô phỏng; 24 bài 1101K; cấu hình và kết quả preview dùng thư mục tạm.\n"
         "Chọn lại mục để mở lại preview.",
     ),
 )
@@ -269,6 +269,11 @@ class WidgetGallery(QMainWindow):
         old = self.preview_area.takeWidget()
         self.preview_widget = None
         if old is not None:
+            if hasattr(old, "closed"):
+                old.closed.connect(old.deleteLater)
+                old.hide()
+                old.close()
+                return
             old.close()
             old.deleteLater()
 

@@ -52,6 +52,10 @@ wheels/
 htmlcov/
 
 # 6. Logs, dữ liệu tạm & cơ sở dữ liệu cục bộ
+# Backup toàn project được giữ cục bộ; không xóa theo quy tắc dọn file tạm.
+/.backup/
+# Thư mục làm việc tạm của công cụ; dọn sau khi kiểm chứng xong.
+.tmp/
 *.log
 logs/
 *.tmp

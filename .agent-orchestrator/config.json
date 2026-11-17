@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "agents": {
+    "antigravity": {
+      "command": "agy",
+      "models": {
+        "fast": "gemini-3.8-flash-medium",
+        "balanced": "gemini-3.8-flash-high",
+        "strong": "gemini-3.1-pro-high"
+      },
+      "session_soft_budget_tokens": 120000,
+      "per_task_estimate_cap_tokens": 30000,
+      "remaining_quota_tokens": null
+    },
+    "codex": {
+      "command": "codex",
+      "models": {
+        "fast": "gpt-5.6-luna",
+        "balanced": "gpt-5.6-terra",
+        "strong": "gpt-6.1-sol"
+      },
+      "session_soft_budget_tokens": 160000,
+      "per_task_estimate_cap_tokens": 60000,
+      "remaining_quota_tokens": null
+    }
+  },
+  "execution": {
+    "timeout_seconds": 900,
+    "max_task_chars": 24000,
+    "require_clean_worktree": true
+  }
+}

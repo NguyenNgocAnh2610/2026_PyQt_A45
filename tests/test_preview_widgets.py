@@ -150,9 +150,9 @@ class GalleryTests(unittest.TestCase):
         self.gallery.show()
         item = self.select("page:src/ui/main_window.py")
         preview = self.gallery.preview_widget
-        button = preview.findChild(QPushButton)
+        button = preview.findChild(QPushButton, "closeWorkspace")
         QTest.mouseClick(button, Qt.LeftButton)
-        self.assertTrue(preview.isHidden())
+        self.wait_for(lambda: preview.isHidden())
         self.assertTrue(self.gallery.isVisible())
         self.gallery.tree.itemClicked.emit(item, 0)
         self.assertIsNot(self.gallery.preview_widget, preview)

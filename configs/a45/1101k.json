@@ -1,0 +1,1537 @@
+{
+  "schema_version": 1,
+  "id": "1101k-10",
+  "name": "Khối 1101K-10",
+  "version": "draft-1",
+  "source_file": "Bài kiểm tra KHỐI 1101K (tiêu chuẩn ).docx",
+  "source_paragraphs": [
+    "CÁC THAM SỐ KHỐI 1101K-10 ",
+    "I. Kiểm tra sự làm việc ổn định  các con quay và các truyền cảm quá tải ",
+    "1.Tham số 1: ",
+    "Cấp điện áp xoay chiều 3 pha ~36V 1000Hz cho khối 10  ",
+    "* Đo kiểm tra điện áp và dòng  khởi động xoay chiều 3 pha ~36V1000Hz :",
+    "- I= 3A ±0,2A",
+    " *Sau 2 phút đo kiểm tra điện áp và dòng  xoay chiều 3 pha ~22V1000Hz .",
+    "- U= ~22V1000Hz ± 50Hz (A)",
+    "- U= ~22V1000Hz ± 50Hz (B)",
+    "- U= ~22V1000Hz ± 50Hz (C)",
+    "* Đo kiểm tra điện áp và dòng xoay chiều tiêu thụ :",
+    "- I= 1,7A ±0,2A",
+    "2. Tham số 2: ",
+    "- Cấp điện áp một chiều U= +27V; U= ±15V; U= ± 12V; U= ±5V cho khối 10 ",
+    "* Đo kiểm tra điện áp và dòng một chiều tiêu thụ :",
+    "- I= 1,37A ±0,2A",
+    "3.Kiểm tra các truyền cảm quá tải: ",
+    "1.Tham số 3:",
+    "- Kiểm tra giá trị điện áp quy không các truyền cảm quá tải ДЛУI, ДЛУII, ДЛУX.",
+    "* Đo tín hiệu điện áp nаX ЗаД ra tại chân 48XP1:  U=0,134±0,05 V ",
+    "* Đo tín hiệu điện áp nаII ЗаД  ra tại chân 34XP1:  U= 0,255±0,05 V  ",
+    "* Đo tín hiệu điện áp nаI ЗаД ra tại chân 37XP1:  U= 0,115±0,05 V ",
+    "2.Tham số4 : Kiểm tra điện áp tín hiệu quá tải kên I( nаI) ",
+    "- Cấp điện áp U= 0,02V vào chân 40XP1 ",
+    "* Đo điện áp ra tại chân ra 37XP1 U= 0,19±0,05 V",
+    "- Cấp điện áp U= 0,5V vào chân 40XP1 ",
+    "* Đo điện áp ra tại chân ra 37XP1 U= 0,35±0,05 V ",
+    "4.Tham số 5: kiểm tra điện áp tín hiệu quá tải kênh II( nаII) ",
+    "- Cấp điện áp U= -0,6V vào chân 41XP1 ",
+    "* Đo điện áp ra tại chân ra 34XP1 U= 0,37±0,05 V",
+    " - Cấp điện áp U= 0,6V vào chân 41XP1 ",
+    "* Đo điện áp ra tại chân ra 34XP1 U= 0,17±0,05 V",
+    "5.Tham số 6: kiểm tra điện áp tín hiệu quá tải kênh III( nаX) ",
+    "- Cấp điện áp U= 0,16V vào chân 42XP1 ",
+    "* Đo điện áp ra tại chân ra 48XP1 U= 0,25±0,05 V",
+    "- Cấp điện áp U= 0,4V vào chân 42XP1 ",
+    "* Đo điện áp ra tại chân ra 48XP1 U= 0,45±0,05 V",
+    "II. Kiểm tra mạch KĐ đỡ tải và bám, các kênh (Panel 1101K.11) ",
+    "4.Tham số 7: kiểm tra mạch điều khiển động cơ M1;M2",
+    "- Cấp điện áp U= 3V vào chân 40XP1 ",
+    "* Đo điện áp ra tại chân ra 50XP1 U= 8,5±0,2 V ",
+    "- Cấp điện áp U= -3V vào chân 40XP1 ",
+    "* Đo điện áp ra tại chân ra 50XP1 U= -8,5±0,2 V",
+    "5.Tham số 8: kiểm tra mạch điều khiển động cơ M3;M4",
+    "- Cấp điện áp U= 3V vào chân 41XP1 ",
+    "* Đo điện áp ra tại chân ra 49XP1 U= 8,5±0,2 V ",
+    "- Cấp điện áp U= -3V vào chân 41XP1 ",
+    "* Đo điện áp ra tại chân ra 49XP1 U= -8,5±0,2 V",
+    "6.Tham số 9: kiểm tra mạch điều khiển động cơ M5;M6",
+    "- Cấp điện áp U= 3V vào chân 42XP1 ",
+    "- Đo điện áp ra tại chân ra 14XP1 U= -9±0,2 V ",
+    "- Cấp điện áp U= -3V vào chân 42XP1 ",
+    "* Đo điện áp ra tại chân ra 14XP1 U= 9±0,2 V",
+    "7.Tham số 10: kiểm tra điện áp mạch điều khiển kênh I (ΩгI)",
+    "- Cấp xung vuông f=10Khz Upp=4,5V vào chân 43XP1 và 44XP1 ",
+    "- Cấp điện áp U= 3V vào chân 22XP1 ",
+    "* Đo điện áp ra tại chân ra 63XP1 U= -6,5±0,2 V ",
+    "- Cấp điện áp U= -3V vào chân 22XP1 ",
+    "- Đo điện áp ra tại chân ra 63XP1 U= 6,5±0,2 V",
+    "8.Tham số 11: kiểm tra điện áp mạch điều khiển kênh II (ΩгII)",
+    "- Cấp xung vuông f=10Khz Upp= 4,5V vào chân 43XP1 và 44XP1",
+    "- Cấp điện áp U= 3V vào chân 32XP1 ",
+    "* Đo điện áp ra tại chân ra 56XP1 U= -6,5±0,2 V ",
+    "- Cấp điện áp U= -3V vào chân 32XP1 ",
+    "* Đo điện áp ra tại chân ra 56XP1 U= 6,5±0,2 V",
+    "9.Tham số 12: kiểm tra điện áp mạch điều khiển kênh III (ɣГ )",
+    "- Cấp xung vuông f=10Khz Upp=4,5V vào chân 43XP1 và 44XP1",
+    "- Cấp điện áp U= 3V vào chân 42XP1 ",
+    "* Đo điện áp ra tại chân ra 14XP1 U= -8,5±0,2 V ",
+    "- Cấp điện áp U= -3V vào chân 42XP1 ",
+    "* Đo điện áp ra tại chân ra 14XP1 U= 8,5V",
+    "III. Kiểm tra Mạch Biến đổi tín hiệu điều khiển theo kênh I;II (Panel 1101K.19-1)",
+    "10.Tham số 13: kiểm tra hiệu chỉnh điện áp mạch quy không  kênh. (ΩI)",
+    "- Cấp điện áp U= 0V vào chân 22XP1 ",
+    "* Đo điện áp ra tại chân ra 26XP1 U=0±0,2 V ",
+    "11.Tham số 14: kiểm tra hiệu chỉnh điện áp mạch quy không  kênh II. (ΩII)",
+    "- Cấp điện áp U= 0V vào chân 32XP1 ",
+    "- Đo điện áp ra tại chân ra 25XP1 U=0±0,2 V ",
+    "12.Tham số 15: kiểm tra điện áp mạch điều khiển quá tải kênh I (Δn-I)",
+    "- Cấp điện áp U= 3V vào chân 22XP1 ",
+    "* Đo điện áp ra tại chân ra 26XP1 U= 4,5±0,2 V ",
+    "- Cấp điện áp U= -3V vào chân 22XP1 ",
+    "* Đo điện áp ra tại chân ra 26XP1 U= -4,5±0,2 V",
+    "13.Tham số 16: kiểm tra điện áp mạch điều khiển quá tải kênh II (Δn-II)",
+    "- Cấp điện áp U= 3V vào chân 32XP1 ",
+    "* Đo điện áp ra tại chân ra 26XP1 U= 4,5±0,2 V ",
+    "- Cấp điện áp U= -3V vào chân 32XP1 ",
+    "* Đo điện áp ra tại chân ra 26XP1 U= -4,5±0,2 V",
+    "IV. Kiểm tra mạch Khuếch đại phối hợp của tín hiệu theo góc (Panel 1101K.19-3)",
+    "14.Tham số 17: kiểm tra điện áp KĐ tín hiệu theo góc ϕ-1Г",
+    "- Cấp điện áp U= 0,4V vào chân 40XP1 ",
+    "* Đo điện áp ra tại chân ra 51XP1 U= -9±0,2 V ",
+    "- Cấp điện áp U= -0,4V vào chân 40XP1 ",
+    "* Đo điện áp ra tại chân ra 51XP1 U= 9V",
+    "15.Tham số 18: kiểm tra điện áp KĐ tín hiệu theo góc ϕ-2Г",
+    "- Cấp điện áp U= 0,4V vào chân 41XP1 ",
+    "* Đo điện áp ra tại chân ra 52XP1 U= -9±0,2 V ",
+    "- Cấp điện áp U= -0,3V vào chân 41XP1 ",
+    "* Đo điện áp ra tại chân ra 52XP1 U= 9±0,2 V",
+    "16.Tham số 19: kiểkiểm tra điện áp KĐ tín hiệu theo góc ɣ-Г",
+    "- Cấp điện áp U= 0,14V vào chân 42XP1 ",
+    "* Đo điện áp ra tại chân ra 29XP1 U= 0±0,2 V",
+    "- Cấp điện áp U= 0,09V vào chân 42XP1 ",
+    "* Đo điện áp ra tại chân ra 29XP1 U= -8,5±0,2 V ",
+    "- Cấp điện áp U= 0,25V vào chân 42XP1 ",
+    "* Đo điện áp ra tại chân ra 29XP1 U= 8,5±0,2 V",
+    "V. Kiểm tra mạch chuyển mạch ngắt tín hiệu điều khiển con quay МГТУ-0,5(Panel 1101K.19-4)",
+    "              (Mạch điều khiển bám theo góc ở chế độbay tự lập)",
+    "*  Cấp lệnh 27V- KOM  điện áp U= 27V vào chân 4XP1 ",
+    "- Cấp  điện áp mức 0 vào chân 40XP1 ",
+    "- Cấp  điện áp mức 0 vào chân 41XP1 ",
+    "- Cấp  điện áp mức 0 vào chân 42XP1 ",
+    "17.Tham số 20: kiểm tra mạch ngắt rơ le K1 khi có lệnh ΟТКЛ ΩI; không có lệnh Cx4",
+    "- Cấp lệnh OTкл ΩI; điện áp mức 0  vào chân 15XP1",
+    "* Đo điện áp ra tại chân ra 50XP1 U= ±8,5±0,2 V",
+    "18.Tham số 21: kiểm tra mạch ngắt rơ le K3 khi có lệnh ΟТКЛ ΩII; không có lệnh Cx4",
+    "- Cấp lệnh OTкл ΩII; điện áp mức 0 vào chân 23XP1",
+    "- Cấp  điện áp vào chân 54XP1 U= ±3V",
+    "* Đo điện áp ra tại chân ra 49XP1 U= ±8,5±0,2 V",
+    "19.Tham số 22: kiểm tra mạch đóng rơ le K1; K3 khi có lệnh CX4 ",
+    "- Cấp lệnh Cx4 điện áp mức 0 vào chân 12XP1 ",
+    "* Đo điện áp ra tại chân ra 50XP1 U= ±8,5±0,2 V",
+    "* Đo điện áp ra tại chân ra 49XP1 U= ±8,5±0,2 V",
+    "20.Tham số 23: kiểm tra mạch ngắt rơ le K2 khi không có lệnh CX3",
+    "- Cấp lệnh Cx3 điện áp U=5V vào chân 13XP1",
+    "* Đo điện áp ra tại chân ra 50XP1 U= ±8±0,2 V ",
+    "21.Tham số 24: kiểm tra mạch đóng rơ le K2 khi có lệnh CX3",
+    "- Cấp lệnh Cx3 điện áp U=5V vào chân 13XP1",
+    "* Đo điện áp ra tại chân ra 49XP1 U= ±8±0,2 V "
+  ],
+  "limitations": [
+    "Bộ chạy bài ghi/đọc hai mảng STM32 (giả lập mức thanh ghi); ánh xạ thanh ghi, trình tự nguồn và thời gian ổn định là GIẢ ĐỊNH, chưa xác minh phần cứng.",
+    "Xung 10 kHz, đo tần số và các tín hiệu bảo vệ chưa có trên CPUv1.0; các bài liên quan giữ BLOCKED."
+  ],
+  "tests": [
+    {
+      "id": "P01",
+      "number": 1,
+      "name": "Nguồn AC ba pha và dòng tiêu thụ",
+      "group": "I · Nguồn và truyền cảm quá tải",
+      "source": "Tham số 1",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "none",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Khởi động ~36 V / 1000 Hz",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "ac_36v",
+              "value": 1
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "ac_current",
+              "nominal": 3,
+              "tolerance": 0.2,
+              "unit": "A"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Sau 120 giây: pha A/B/C và dòng tiêu thụ",
+          "capability": "stimulate_measure",
+          "actions": [],
+          "wait_ms": 120000,
+          "timing_basis": "Tiêu chuẩn",
+          "checks": [
+            {
+              "signal": "ac_A",
+              "nominal": 22,
+              "tolerance": null,
+              "unit": "V"
+            },
+            {
+              "signal": "ac_B",
+              "nominal": 22,
+              "tolerance": null,
+              "unit": "V"
+            },
+            {
+              "signal": "ac_C",
+              "nominal": 22,
+              "tolerance": null,
+              "unit": "V"
+            },
+            {
+              "signal": "hz_A",
+              "nominal": 1000,
+              "tolerance": 50,
+              "unit": "Hz"
+            },
+            {
+              "signal": "hz_B",
+              "nominal": 1000,
+              "tolerance": 50,
+              "unit": "Hz"
+            },
+            {
+              "signal": "hz_C",
+              "nominal": 1000,
+              "tolerance": 50,
+              "unit": "Hz"
+            },
+            {
+              "signal": "ac_current",
+              "nominal": 1.7,
+              "tolerance": 0.2,
+              "unit": "A"
+            }
+          ],
+          "issues": [
+            "Chưa rõ thao tác chuyển 36 V sang 22 V; thiếu dung sai điện áp."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P02",
+      "number": 2,
+      "name": "Nguồn DC và dòng tiêu thụ",
+      "group": "I · Nguồn và truyền cảm quá tải",
+      "source": "Tham số 2",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "none",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Cấp +27 V, ±15 V, ±12 V, ±5 V; đo dòng",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "dc_27v",
+              "value": 1
+            },
+            {
+              "signal": "dc_15v",
+              "value": 1
+            },
+            {
+              "signal": "dc_12v",
+              "value": 1
+            },
+            {
+              "signal": "dc_5v",
+              "value": 1
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "dc_current",
+              "nominal": 1.37,
+              "tolerance": 0.2,
+              "unit": "A"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P03",
+      "number": 3,
+      "name": "Điện áp quy không truyền cảm quá tải",
+      "group": "I · Nguồn và truyền cảm quá tải",
+      "source": "Tham số 3",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Đo ba kênh",
+          "capability": "stimulate_measure",
+          "actions": [],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_48",
+              "nominal": 0.134,
+              "tolerance": 0.05,
+              "unit": "V"
+            },
+            {
+              "signal": "xp1_34",
+              "nominal": 0.255,
+              "tolerance": 0.05,
+              "unit": "V"
+            },
+            {
+              "signal": "xp1_37",
+              "nominal": 0.115,
+              "tolerance": 0.05,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P04",
+      "number": 4,
+      "name": "Tín hiệu quá tải kênh I",
+      "group": "I · Nguồn và truyền cảm quá tải",
+      "source": "Tham số 4",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích +0,02 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_40",
+              "value": 0.02
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_37",
+              "nominal": 0.19,
+              "tolerance": 0.05,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Kích thích +0,5 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_40",
+              "value": 0.5
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_37",
+              "nominal": 0.35,
+              "tolerance": 0.05,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P05",
+      "number": 5,
+      "name": "Tín hiệu quá tải kênh II",
+      "group": "I · Nguồn và truyền cảm quá tải",
+      "source": "Tham số 5",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích −0,6 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_41",
+              "value": -0.6
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_34",
+              "nominal": 0.37,
+              "tolerance": 0.05,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Kích thích +0,6 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_41",
+              "value": 0.6
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_34",
+              "nominal": 0.17,
+              "tolerance": 0.05,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P06",
+      "number": 6,
+      "name": "Tín hiệu quá tải kênh III",
+      "group": "I · Nguồn và truyền cảm quá tải",
+      "source": "Tham số 6",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích +0,16 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_42",
+              "value": 0.16
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_48",
+              "nominal": 0.25,
+              "tolerance": 0.05,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Kích thích +0,4 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_42",
+              "value": 0.4
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_48",
+              "nominal": 0.45,
+              "tolerance": 0.05,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P07",
+      "number": 7,
+      "name": "Động cơ M1/M2",
+      "group": "II · Panel 1101K.11",
+      "source": "Tham số 7",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích +3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_40",
+              "value": 3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_50",
+              "nominal": 8.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Kích thích −3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_40",
+              "value": -3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_50",
+              "nominal": -8.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P08",
+      "number": 8,
+      "name": "Động cơ M3/M4",
+      "group": "II · Panel 1101K.11",
+      "source": "Tham số 8",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích +3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_41",
+              "value": 3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_49",
+              "nominal": 8.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Kích thích −3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_41",
+              "value": -3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_49",
+              "nominal": -8.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P09",
+      "number": 9,
+      "name": "Động cơ M5/M6",
+      "group": "II · Panel 1101K.11",
+      "source": "Tham số 9",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích +3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_42",
+              "value": 3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_14",
+              "nominal": -9,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Kích thích −3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_42",
+              "value": -3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_14",
+              "nominal": 9,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P10",
+      "number": 10,
+      "name": "Điều khiển kênh I",
+      "group": "II · Panel 1101K.11",
+      "source": "Tham số 10",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Xung 10 kHz / 4,5 Vpp tại 43/44XP1; kích thích +3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_43",
+              "value": 4.5
+            },
+            {
+              "signal": "set_44",
+              "value": 4.5
+            },
+            {
+              "signal": "set_22",
+              "value": 3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_63",
+              "nominal": -6.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Giữ xung; kích thích −3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_22",
+              "value": -3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_63",
+              "nominal": 6.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P11",
+      "number": 11,
+      "name": "Điều khiển kênh II",
+      "group": "II · Panel 1101K.11",
+      "source": "Tham số 11",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Xung 10 kHz / 4,5 Vpp tại 43/44XP1; kích thích +3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_43",
+              "value": 4.5
+            },
+            {
+              "signal": "set_44",
+              "value": 4.5
+            },
+            {
+              "signal": "set_32",
+              "value": 3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_56",
+              "nominal": -6.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Giữ xung; kích thích −3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_32",
+              "value": -3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_56",
+              "nominal": 6.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P12",
+      "number": 12,
+      "name": "Điều khiển kênh III",
+      "group": "II · Panel 1101K.11",
+      "source": "Tham số 12",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Xung 10 kHz / 4,5 Vpp tại 43/44XP1; kích thích +3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_43",
+              "value": 4.5
+            },
+            {
+              "signal": "set_44",
+              "value": 4.5
+            },
+            {
+              "signal": "set_42",
+              "value": 3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_14",
+              "nominal": -8.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Giữ xung; kích thích −3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_42",
+              "value": -3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_14",
+              "nominal": 8.5,
+              "tolerance": null,
+              "unit": "V"
+            }
+          ],
+          "issues": [
+            "Thiếu dung sai nhánh +8,5 V."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P13",
+      "number": 13,
+      "name": "Hiệu chỉnh quy không kênh I",
+      "group": "III · Panel 1101K.19-1",
+      "source": "Tham số 13",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích 0 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_22",
+              "value": 0
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_26",
+              "nominal": 0,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P14",
+      "number": 14,
+      "name": "Hiệu chỉnh quy không kênh II",
+      "group": "III · Panel 1101K.19-1",
+      "source": "Tham số 14",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích 0 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_32",
+              "value": 0
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_25",
+              "nominal": 0,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P15",
+      "number": 15,
+      "name": "Điều khiển quá tải kênh I",
+      "group": "III · Panel 1101K.19-1",
+      "source": "Tham số 15",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích +3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_22",
+              "value": 3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_26",
+              "nominal": 4.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Kích thích −3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_22",
+              "value": -3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_26",
+              "nominal": -4.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P16",
+      "number": 16,
+      "name": "Điều khiển quá tải kênh II",
+      "group": "III · Panel 1101K.19-1",
+      "source": "Tham số 16",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [
+        "Tài liệu ghi đầu ra 26XP1 cho kênh II; cần xác minh."
+      ],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích +3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_32",
+              "value": 3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_26",
+              "nominal": 4.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Kích thích −3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_32",
+              "value": -3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_26",
+              "nominal": -4.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P17",
+      "number": 17,
+      "name": "Khuếch đại theo góc kênh I",
+      "group": "IV · Panel 1101K.19-3",
+      "source": "Tham số 17",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích +0,4 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_40",
+              "value": 0.4
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_51",
+              "nominal": -9,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Kích thích −0,4 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_40",
+              "value": -0.4
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_51",
+              "nominal": 9,
+              "tolerance": null,
+              "unit": "V"
+            }
+          ],
+          "issues": [
+            "Thiếu dung sai nhánh +9 V."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P18",
+      "number": 18,
+      "name": "Khuếch đại theo góc kênh II",
+      "group": "IV · Panel 1101K.19-3",
+      "source": "Tham số 18",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích +0,4 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_41",
+              "value": 0.4
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_52",
+              "nominal": -9,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Kích thích −0,3 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_41",
+              "value": -0.3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_52",
+              "nominal": 9,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P19",
+      "number": 19,
+      "name": "Khuếch đại theo góc kênh III",
+      "group": "IV · Panel 1101K.19-3",
+      "source": "Tham số 19",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Kích thích 0.14 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_42",
+              "value": 0.14
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_29",
+              "nominal": 0,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Kích thích 0.09 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_42",
+              "value": 0.09
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_29",
+              "nominal": -8.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        },
+        {
+          "id": "S03",
+          "title": "Kích thích 0.25 V",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_42",
+              "value": 0.25
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_29",
+              "nominal": 8.5,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "P20",
+      "number": 20,
+      "name": "Ngắt K1 khi có ОТКЛ ΩI, không CX4",
+      "group": "V · Panel 1101K.19-4",
+      "source": "Tham số 20",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all_section_v",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Lệnh ОТКЛ ΩI: mức 0 tại 15XP1 (không CX4)",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_15",
+              "value": 0
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_50",
+              "nominal": null,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": [
+            "Giá trị ± cần xác minh từng cực tính và điều kiện kích thích."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P21",
+      "number": 21,
+      "name": "Ngắt K3 khi có ОТКЛ ΩII, không CX4",
+      "group": "V · Panel 1101K.19-4",
+      "source": "Tham số 21",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all_section_v",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Lệnh ОТКЛ ΩII: mức 0 tại 23XP1 (không CX4)",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_23",
+              "value": 0
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_49",
+              "nominal": null,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": [
+            "Giá trị ± cần xác minh từng cực tính và điều kiện kích thích.",
+            "Kích thích ±3 V tại 54XP1 cần xác định tương ứng từng nhánh."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P22",
+      "number": 22,
+      "name": "Đóng K1/K3 khi có CX4",
+      "group": "V · Panel 1101K.19-4",
+      "source": "Tham số 22",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all_section_v",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Lệnh CX4: mức 0 tại 12XP1",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_12",
+              "value": 0
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_50",
+              "nominal": null,
+              "tolerance": 0.2,
+              "unit": "V"
+            },
+            {
+              "signal": "xp1_49",
+              "nominal": null,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": [
+            "Giá trị ± cần xác minh từng cực tính và điều kiện kích thích."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P23",
+      "number": 23,
+      "name": "Ngắt K2 khi không có CX3",
+      "group": "V · Panel 1101K.19-4",
+      "source": "Tham số 23",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all_section_v",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Lệnh CX3: 5 V tại 13XP1",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_13",
+              "value": 5
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_50",
+              "nominal": null,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": [
+            "Giá trị ± cần xác minh từng cực tính và điều kiện kích thích.",
+            "Điều kiện có/không CX3 nhưng cùng ghi 5 V tại 13XP1."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P24",
+      "number": 24,
+      "name": "Đóng K2 khi có CX3",
+      "group": "V · Panel 1101K.19-4",
+      "source": "Tham số 24",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "power_all_section_v",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Lệnh CX3: 5 V tại 13XP1",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_13",
+              "value": 5
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_49",
+              "nominal": null,
+              "tolerance": 0.2,
+              "unit": "V"
+            }
+          ],
+          "issues": [
+            "Giá trị ± cần xác minh từng cực tính và điều kiện kích thích.",
+            "Điều kiện có/không CX3 nhưng cùng ghi 5 V tại 13XP1."
+          ]
+        }
+      ]
+    }
+  ],
+  "sequences": {
+    "none": {
+      "basis": "Không có thao tác chuẩn bị.",
+      "actions": []
+    },
+    "safe_state": {
+      "basis": "Chỉ đưa về hardware.stm32_io.safe_state (giả định an toàn, chưa xác minh).",
+      "actions": []
+    },
+    "power_all": {
+      "basis": "GIẢ ĐỊNH, chưa xác minh: khối được cấp đủ AC ~36 V/1000 Hz và DC +27/±15/±12/±5 V (tham số 1–2) trước khi kích thích. Thứ tự và thời gian ổn định nguồn chưa có trong tài liệu.",
+      "actions": [
+        {
+          "signal": "ac_36v",
+          "value": 1
+        },
+        {
+          "signal": "dc_27v",
+          "value": 1
+        },
+        {
+          "signal": "dc_15v",
+          "value": 1
+        },
+        {
+          "signal": "dc_12v",
+          "value": 1
+        },
+        {
+          "signal": "dc_5v",
+          "value": 1
+        }
+      ]
+    },
+    "power_all_section_v": {
+      "basis": "GIẢ ĐỊNH như power_all, cộng điều kiện chung mục V (docs/BAI_KIEM_TRA_1101K.md): 27V-KOM vào 4XP1, mức 0 vào 40/41/42XP1.",
+      "actions": [
+        {
+          "signal": "ac_36v",
+          "value": 1
+        },
+        {
+          "signal": "dc_27v",
+          "value": 1
+        },
+        {
+          "signal": "dc_15v",
+          "value": 1
+        },
+        {
+          "signal": "dc_12v",
+          "value": 1
+        },
+        {
+          "signal": "dc_5v",
+          "value": 1
+        },
+        {
+          "signal": "set_4",
+          "value": 27
+        },
+        {
+          "signal": "set_40",
+          "value": 0
+        },
+        {
+          "signal": "set_41",
+          "value": 0
+        },
+        {
+          "signal": "set_42",
+          "value": 0
+        }
+      ]
+    }
+  }
+}

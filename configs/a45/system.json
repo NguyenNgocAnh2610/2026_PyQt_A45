@@ -1,0 +1,747 @@
+{
+  "schema_version": 1,
+  "id": "a45",
+  "name": "GIÁ THỬ A45",
+  "subtitle": "TESTBENCH AUTOMATION",
+  "target_file": "1101k.json",
+  "hardware_file": "hardware.json",
+  "fixtures_file": "mock.json",
+  "status_signals": {
+    "ready": "ready",
+    "output": "output",
+    "fault": "fault"
+  },
+  "signals": [
+    {
+      "id": "ready",
+      "label": "Sẵn sàng",
+      "group": "Trạng thái chung",
+      "unit": "",
+      "kind": "boolean",
+      "source": "confirmed",
+      "decimals": 2,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "output",
+      "label": "Đầu ra xác nhận",
+      "group": "Trạng thái chung",
+      "unit": "",
+      "kind": "boolean",
+      "source": "confirmed",
+      "decimals": 2,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "fault",
+      "label": "Bảo vệ",
+      "group": "Trạng thái chung",
+      "unit": "",
+      "kind": "boolean",
+      "source": "confirmed",
+      "decimals": 2,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "BÌNH THƯỜNG",
+          "color": "#26ed86"
+        },
+        "1": {
+          "label": "LỖI",
+          "color": "#ff6579"
+        }
+      }
+    },
+    {
+      "id": "ac_current",
+      "label": "Dòng AC",
+      "group": "Nguồn",
+      "unit": "A",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 2,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "dc_current",
+      "label": "Dòng DC",
+      "group": "Nguồn",
+      "unit": "A",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 2,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "ac_A",
+      "label": "Điện áp pha A",
+      "group": "Nguồn",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "hz_A",
+      "label": "Tần số pha A",
+      "group": "Nguồn",
+      "unit": "Hz",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 2,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "ac_B",
+      "label": "Điện áp pha B",
+      "group": "Nguồn",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "hz_B",
+      "label": "Tần số pha B",
+      "group": "Nguồn",
+      "unit": "Hz",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 2,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "ac_C",
+      "label": "Điện áp pha C",
+      "group": "Nguồn",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "hz_C",
+      "label": "Tần số pha C",
+      "group": "Nguồn",
+      "unit": "Hz",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 2,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_14",
+      "label": "XP1 · chân 14",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_25",
+      "label": "XP1 · chân 25",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_26",
+      "label": "XP1 · chân 26",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_29",
+      "label": "XP1 · chân 29",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_34",
+      "label": "XP1 · chân 34",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_37",
+      "label": "XP1 · chân 37",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_48",
+      "label": "XP1 · chân 48",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_49",
+      "label": "XP1 · chân 49",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_50",
+      "label": "XP1 · chân 50",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_51",
+      "label": "XP1 · chân 51",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_52",
+      "label": "XP1 · chân 52",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_56",
+      "label": "XP1 · chân 56",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "xp1_63",
+      "label": "XP1 · chân 63",
+      "group": "Đáp ứng khối",
+      "unit": "V",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_4",
+      "label": "Yêu cầu XP1 · 4",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_12",
+      "label": "Yêu cầu XP1 · 12",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_13",
+      "label": "Yêu cầu XP1 · 13",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_15",
+      "label": "Yêu cầu XP1 · 15",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_22",
+      "label": "Yêu cầu XP1 · 22",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_23",
+      "label": "Yêu cầu XP1 · 23",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_32",
+      "label": "Yêu cầu XP1 · 32",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_40",
+      "label": "Yêu cầu XP1 · 40",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_41",
+      "label": "Yêu cầu XP1 · 41",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_42",
+      "label": "Yêu cầu XP1 · 42",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_43",
+      "label": "Yêu cầu XP1 · 43",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_44",
+      "label": "Yêu cầu XP1 · 44",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "set_54",
+      "label": "Yêu cầu XP1 · 54",
+      "group": "Giá trị yêu cầu",
+      "unit": "V",
+      "kind": "number",
+      "source": "derived",
+      "decimals": 3,
+      "stale_ms": 1000,
+      "chart": true,
+      "states": {}
+    },
+    {
+      "id": "ac_36v",
+      "label": "Lệnh nguồn AC 3 pha ~36 V / 1000 Hz",
+      "group": "Lệnh nguồn",
+      "unit": "",
+      "kind": "boolean",
+      "source": "derived",
+      "decimals": 0,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "dc_27v",
+      "label": "Lệnh nguồn DC +27 V",
+      "group": "Lệnh nguồn",
+      "unit": "",
+      "kind": "boolean",
+      "source": "derived",
+      "decimals": 0,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "dc_15v",
+      "label": "Lệnh nguồn DC ±15 V",
+      "group": "Lệnh nguồn",
+      "unit": "",
+      "kind": "boolean",
+      "source": "derived",
+      "decimals": 0,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "dc_12v",
+      "label": "Lệnh nguồn DC ±12 V",
+      "group": "Lệnh nguồn",
+      "unit": "",
+      "kind": "boolean",
+      "source": "derived",
+      "decimals": 0,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "dc_5v",
+      "label": "Lệnh nguồn DC ±5 V",
+      "group": "Lệnh nguồn",
+      "unit": "",
+      "kind": "boolean",
+      "source": "derived",
+      "decimals": 0,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "diag_link",
+      "label": "Truyền thông demo",
+      "group": "Tự kiểm tra mô phỏng",
+      "unit": "",
+      "kind": "boolean",
+      "source": "confirmed",
+      "decimals": 2,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "diag_io",
+      "label": "I/O demo",
+      "group": "Tự kiểm tra mô phỏng",
+      "unit": "",
+      "kind": "boolean",
+      "source": "confirmed",
+      "decimals": 2,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "diag_adc",
+      "label": "Thu mẫu demo",
+      "group": "Tự kiểm tra mô phỏng",
+      "unit": "",
+      "kind": "boolean",
+      "source": "confirmed",
+      "decimals": 2,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    }
+  ],
+  "diagnostics": [
+    {
+      "id": "D01",
+      "name": "Phản hồi truyền thông (demo)",
+      "group": "Tự kiểm tra giá thử · DEMO",
+      "source": "Kịch bản minh họa, chưa phải tiêu chuẩn giá thử",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "none",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Phản hồi truyền thông",
+          "capability": "diagnose",
+          "actions": [],
+          "wait_ms": 250,
+          "timing_basis": "demo",
+          "checks": [
+            {
+              "signal": "diag_link",
+              "nominal": 1,
+              "tolerance": 0,
+              "unit": ""
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "D02",
+      "name": "Trạng thái I/O (demo)",
+      "group": "Tự kiểm tra giá thử · DEMO",
+      "source": "Kịch bản minh họa, chưa phải tiêu chuẩn giá thử",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "none",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Trạng thái I/O",
+          "capability": "diagnose",
+          "actions": [],
+          "wait_ms": 250,
+          "timing_basis": "demo",
+          "checks": [
+            {
+              "signal": "diag_io",
+              "nominal": 1,
+              "tolerance": 0,
+              "unit": ""
+            }
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "D03",
+      "name": "Thu mẫu (demo)",
+      "group": "Tự kiểm tra giá thử · DEMO",
+      "source": "Kịch bản minh họa, chưa phải tiêu chuẩn giá thử",
+      "dependencies": [],
+      "independence": "mock_only",
+      "preparation": "none",
+      "cleanup": "safe_state",
+      "issues": [],
+      "steps": [
+        {
+          "id": "S01",
+          "title": "Thu mẫu",
+          "capability": "diagnose",
+          "actions": [],
+          "wait_ms": 250,
+          "timing_basis": "demo",
+          "checks": [
+            {
+              "signal": "diag_adc",
+              "nominal": 1,
+              "tolerance": 0,
+              "unit": ""
+            }
+          ],
+          "issues": []
+        }
+      ]
+    }
+  ]
+}

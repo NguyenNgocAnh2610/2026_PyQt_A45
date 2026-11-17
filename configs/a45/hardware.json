@@ -1,0 +1,512 @@
+{
+  "schema_version": 1,
+  "adapter": "stm32",
+  "production_ready": false,
+  "capabilities": [
+    "stimulate_measure",
+    "diagnose"
+  ],
+  "serial": {
+    "port": null,
+    "baudrate": 115200,
+    "parity": "N",
+    "stop_bits": 1,
+    "slave": 9
+  },
+  "registers": {
+    "commit": 4095,
+    "request_mailbox": 4096,
+    "response_mailbox": 8192
+  },
+  "unresolved": [
+    "Bộ chạy bài ghi/đọc hai mảng STM32 CPUv1.0 (FC03/06/16); mọi ánh xạ trong stm32_io đang là GIẢ ĐỊNH theo CPUv1.0, chưa xác minh trên giá thử.",
+    "registers/wire_signals bên dưới chỉ còn phục vụ chẩn đoán A45 v1 cũ và cấu hình mock.",
+    "Chưa xác minh nguồn, liên động, dừng và trình tự kết thúc."
+  ],
+  "wire_signals": {
+    "ready": 1,
+    "output": 2,
+    "fault": 3,
+    "ac_current": 4,
+    "dc_current": 5,
+    "ac_A": 6,
+    "hz_A": 7,
+    "ac_B": 8,
+    "hz_B": 9,
+    "ac_C": 10,
+    "hz_C": 11,
+    "xp1_14": 12,
+    "xp1_25": 13,
+    "xp1_26": 14,
+    "xp1_29": 15,
+    "xp1_34": 16,
+    "xp1_37": 17,
+    "xp1_48": 18,
+    "xp1_49": 19,
+    "xp1_50": 20,
+    "xp1_51": 21,
+    "xp1_52": 22,
+    "xp1_56": 23,
+    "xp1_63": 24,
+    "set_4": 25,
+    "set_12": 26,
+    "set_13": 27,
+    "set_15": 28,
+    "set_22": 29,
+    "set_23": 30,
+    "set_32": 31,
+    "set_40": 32,
+    "set_41": 33,
+    "set_42": 34,
+    "set_43": 35,
+    "set_44": 36,
+    "set_54": 37,
+    "diag_link": 38,
+    "diag_io": 39,
+    "diag_adc": 40,
+    "ac_36v": 41,
+    "dc_27v": 42,
+    "dc_15v": 43,
+    "dc_12v": 44,
+    "dc_5v": 45
+  },
+  "stm32_io": {
+    "slave": 9,
+    "note": "Mặc định theo CPUv1.0; chưa xác minh trên giá thử 1101K. Xem PROGRESS.md mục \"Rà soát 1101K ↔ CPUv1.0\".",
+    "mux_register": "MUX",
+    "mux_settle_ms": 20,
+    "mux_note": "CPUv1.0 dùng MUX dạng bit (bit1 = R+); mã chọn kênh và thời gian ổn định 20 ms là GIẢ ĐỊNH.",
+    "session": {
+      "Mode": 1,
+      "Plan": 2
+    },
+    "session_note": "Mode=1 (AutoComputer) bắt buộc để MCU thực thi; Plan=2 (Test) giả định, Plan=0 sẽ gọi SelfTest.",
+    "safe_state": {
+      "DAC_val": 0,
+      "DOUT": 0,
+      "SW01": 0,
+      "SW02": 0,
+      "MUX": 0,
+      "Power": 0
+    },
+    "safe_state_note": "Giả định: tắt toàn bộ nguồn/định tuyến, DAC_val=0. Mức điện thực tế của DAC_val=0 cần đo.",
+    "outputs": {
+      "ac_36v": {
+        "kind": "bit",
+        "register": "Power",
+        "bit": 0,
+        "on_value": 1,
+        "status": "assumed",
+        "note": "CPUv1.0 không có bit nguồn AC 3 pha; dùng bit 0 (chưa dùng) làm chỗ giữ."
+      },
+      "dc_27v": {
+        "kind": "bit",
+        "register": "Power",
+        "bit": 1,
+        "on_value": 1,
+        "status": "assumed",
+        "note": "CPUv1.0 bit1 = rơ-le 24 V; giá thử cần +27 V."
+      },
+      "dc_12v": {
+        "kind": "bit",
+        "register": "Power",
+        "bit": 2,
+        "on_value": 1,
+        "status": "assumed",
+        "note": "CPUv1.0 bit2 = rơ-le 12 V; giả định một bit cấp cả ±12 V."
+      },
+      "dc_15v": {
+        "kind": "bit",
+        "register": "Power",
+        "bit": 3,
+        "on_value": 1,
+        "status": "assumed",
+        "note": "CPUv1.0 không có ±15 V; bit 3 (chưa dùng) làm chỗ giữ."
+      },
+      "dc_5v": {
+        "kind": "bit",
+        "register": "Power",
+        "bit": 4,
+        "on_value": 1,
+        "status": "assumed",
+        "note": "CPUv1.0 bit4 = rơ-le 5 V; giả định một bit cấp cả ±5 V."
+      },
+      "set_4": {
+        "kind": "bit",
+        "register": "SW01",
+        "bit": 0,
+        "on_value": 27,
+        "status": "assumed",
+        "note": "Lệnh 27V-KOM vào 4XP1; bit SW01 giả định."
+      },
+      "set_12": {
+        "kind": "bit",
+        "register": "SW01",
+        "bit": 1,
+        "on_value": 0,
+        "status": "assumed",
+        "note": "Lệnh CX4: mức 0 vào 12XP1; bit SW01 giả định."
+      },
+      "set_13": {
+        "kind": "bit",
+        "register": "SW01",
+        "bit": 2,
+        "on_value": 5,
+        "status": "assumed",
+        "note": "Lệnh CX3: 5 V vào 13XP1; bit SW01 giả định."
+      },
+      "set_15": {
+        "kind": "bit",
+        "register": "SW01",
+        "bit": 3,
+        "on_value": 0,
+        "status": "assumed",
+        "note": "Lệnh ОТКЛ ΩI: mức 0 vào 15XP1; bit SW01 giả định."
+      },
+      "set_23": {
+        "kind": "bit",
+        "register": "SW01",
+        "bit": 4,
+        "on_value": 0,
+        "status": "assumed",
+        "note": "Lệnh ОТКЛ ΩII: mức 0 vào 23XP1; bit SW01 giả định."
+      },
+      "set_22": {
+        "kind": "analog",
+        "register": "DAC_val",
+        "route": [
+          {
+            "register": "SW02",
+            "bit": 1
+          }
+        ],
+        "scale": -0.005,
+        "offset": 0,
+        "min": -3.5,
+        "max": 3.5,
+        "count_min": -1083,
+        "count_max": 1045,
+        "status": "assumed",
+        "note": "DAC1 (PA4) định tuyến tới 22XP1 qua SW02.bit1 (bit giả định). CPUv1.0: V_DAC = 1.62 − DAC_val/1000·1.55; hệ số tầng ra tới chân (−5 mV/mã, 0 → 0 V) là GIẢ ĐỊNH, cần hiệu chuẩn."
+      },
+      "set_32": {
+        "kind": "analog",
+        "register": "DAC_val",
+        "route": [
+          {
+            "register": "SW02",
+            "bit": 2
+          }
+        ],
+        "scale": -0.005,
+        "offset": 0,
+        "min": -3.5,
+        "max": 3.5,
+        "count_min": -1083,
+        "count_max": 1045,
+        "status": "assumed",
+        "note": "DAC1 (PA4) định tuyến tới 32XP1 qua SW02.bit2 (bit giả định). CPUv1.0: V_DAC = 1.62 − DAC_val/1000·1.55; hệ số tầng ra tới chân (−5 mV/mã, 0 → 0 V) là GIẢ ĐỊNH, cần hiệu chuẩn."
+      },
+      "set_40": {
+        "kind": "analog",
+        "register": "DAC_val",
+        "route": [
+          {
+            "register": "SW02",
+            "bit": 3
+          }
+        ],
+        "scale": -0.005,
+        "offset": 0,
+        "min": -3.5,
+        "max": 3.5,
+        "count_min": -1083,
+        "count_max": 1045,
+        "status": "assumed",
+        "note": "DAC1 (PA4) định tuyến tới 40XP1 qua SW02.bit3 (bit giả định). CPUv1.0: V_DAC = 1.62 − DAC_val/1000·1.55; hệ số tầng ra tới chân (−5 mV/mã, 0 → 0 V) là GIẢ ĐỊNH, cần hiệu chuẩn."
+      },
+      "set_41": {
+        "kind": "analog",
+        "register": "DAC_val",
+        "route": [
+          {
+            "register": "SW02",
+            "bit": 4
+          }
+        ],
+        "scale": -0.005,
+        "offset": 0,
+        "min": -3.5,
+        "max": 3.5,
+        "count_min": -1083,
+        "count_max": 1045,
+        "status": "assumed",
+        "note": "DAC1 (PA4) định tuyến tới 41XP1 qua SW02.bit4 (bit giả định). CPUv1.0: V_DAC = 1.62 − DAC_val/1000·1.55; hệ số tầng ra tới chân (−5 mV/mã, 0 → 0 V) là GIẢ ĐỊNH, cần hiệu chuẩn."
+      },
+      "set_42": {
+        "kind": "analog",
+        "register": "DAC_val",
+        "route": [
+          {
+            "register": "SW02",
+            "bit": 5
+          }
+        ],
+        "scale": -0.005,
+        "offset": 0,
+        "min": -3.5,
+        "max": 3.5,
+        "count_min": -1083,
+        "count_max": 1045,
+        "status": "assumed",
+        "note": "DAC1 (PA4) định tuyến tới 42XP1 qua SW02.bit5 (bit giả định). CPUv1.0: V_DAC = 1.62 − DAC_val/1000·1.55; hệ số tầng ra tới chân (−5 mV/mã, 0 → 0 V) là GIẢ ĐỊNH, cần hiệu chuẩn."
+      },
+      "set_54": {
+        "kind": "analog",
+        "register": "DAC_val",
+        "route": [
+          {
+            "register": "SW02",
+            "bit": 6
+          }
+        ],
+        "scale": -0.005,
+        "offset": 0,
+        "min": -3.5,
+        "max": 3.5,
+        "count_min": -1083,
+        "count_max": 1045,
+        "status": "assumed",
+        "note": "DAC1 (PA4) định tuyến tới 54XP1 qua SW02.bit6 (bit giả định). CPUv1.0: V_DAC = 1.62 − DAC_val/1000·1.55; hệ số tầng ra tới chân (−5 mV/mã, 0 → 0 V) là GIẢ ĐỊNH, cần hiệu chuẩn."
+      },
+      "set_43": {
+        "status": "unsupported",
+        "reason": "Cần xung vuông 10 kHz 4,5 Vpp; bộ phát encoder CPUv1.0 có chu kỳ ≥ 4 ms (≤ 250 Hz), không tạo được. Cần bổ sung phần cứng/firmware."
+      },
+      "set_44": {
+        "status": "unsupported",
+        "reason": "Cần xung vuông 10 kHz 4,5 Vpp; bộ phát encoder CPUv1.0 có chu kỳ ≥ 4 ms (≤ 250 Hz), không tạo được. Cần bổ sung phần cứng/firmware."
+      }
+    },
+    "inputs": {
+      "ready": {
+        "kind": "link",
+        "status": "assumed",
+        "note": "Chỉ là FC03 hợp lệ; MCU không có cờ sẵn sàng riêng."
+      },
+      "output": {
+        "status": "unsupported",
+        "reason": "CPUv1.0 không báo trạng thái đầu ra đã thực thi."
+      },
+      "fault": {
+        "status": "unsupported",
+        "reason": "CPUv1.0 không có tín hiệu bảo vệ/fault cho PC."
+      },
+      "ac_current": {
+        "kind": "adc",
+        "register": "ADC4_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 1,
+        "status": "assumed",
+        "note": "Cảm biến dòng → ADC4_val (±7,5 V, raw/100); giả định 1 V/A. CPUv1.0 không có kênh dòng."
+      },
+      "dc_current": {
+        "kind": "adc",
+        "register": "ADC4_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 2,
+        "status": "assumed",
+        "note": "Cảm biến dòng → ADC4_val (±7,5 V, raw/100); giả định 1 V/A. CPUv1.0 không có kênh dòng."
+      },
+      "ac_A": {
+        "kind": "adc",
+        "register": "ADC0_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 3,
+        "status": "assumed",
+        "note": "ADC0_val (±100 V) đo DC; cần bộ chuyển RMS cho AC — giả định."
+      },
+      "ac_B": {
+        "kind": "adc",
+        "register": "ADC0_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 4,
+        "status": "assumed",
+        "note": "ADC0_val (±100 V) đo DC; cần bộ chuyển RMS cho AC — giả định."
+      },
+      "ac_C": {
+        "kind": "adc",
+        "register": "ADC0_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 5,
+        "status": "assumed",
+        "note": "ADC0_val (±100 V) đo DC; cần bộ chuyển RMS cho AC — giả định."
+      },
+      "hz_A": {
+        "status": "unsupported",
+        "reason": "CPUv1.0 không đo tần số."
+      },
+      "hz_B": {
+        "status": "unsupported",
+        "reason": "CPUv1.0 không đo tần số."
+      },
+      "hz_C": {
+        "status": "unsupported",
+        "reason": "CPUv1.0 không đo tần số."
+      },
+      "diag_link": {
+        "kind": "link",
+        "status": "assumed",
+        "note": "FC03 tới STM32 hợp lệ."
+      },
+      "diag_io": {
+        "status": "unsupported",
+        "reason": "Chưa định nghĩa bài tự kiểm tra I/O trên CPUv1.0."
+      },
+      "diag_adc": {
+        "status": "unsupported",
+        "reason": "Chưa định nghĩa bài tự kiểm tra ADC trên CPUv1.0."
+      },
+      "xp1_14": {
+        "kind": "adc",
+        "register": "ADC3_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 6,
+        "status": "assumed",
+        "note": "14XP1 qua MUX mã 6 (giả định) → ADC3_val (±12 V, raw/100)."
+      },
+      "xp1_25": {
+        "kind": "adc",
+        "register": "ADC3_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 7,
+        "status": "assumed",
+        "note": "25XP1 qua MUX mã 7 (giả định) → ADC3_val (±12 V, raw/100)."
+      },
+      "xp1_26": {
+        "kind": "adc",
+        "register": "ADC3_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 8,
+        "status": "assumed",
+        "note": "26XP1 qua MUX mã 8 (giả định) → ADC3_val (±12 V, raw/100)."
+      },
+      "xp1_29": {
+        "kind": "adc",
+        "register": "ADC3_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 9,
+        "status": "assumed",
+        "note": "29XP1 qua MUX mã 9 (giả định) → ADC3_val (±12 V, raw/100)."
+      },
+      "xp1_34": {
+        "kind": "adc",
+        "register": "ADC4_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 10,
+        "status": "assumed",
+        "note": "34XP1 qua MUX mã 10 (giả định) → ADC4_val (±7,5 V, raw/100)."
+      },
+      "xp1_37": {
+        "kind": "adc",
+        "register": "ADC4_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 11,
+        "status": "assumed",
+        "note": "37XP1 qua MUX mã 11 (giả định) → ADC4_val (±7,5 V, raw/100)."
+      },
+      "xp1_48": {
+        "kind": "adc",
+        "register": "ADC4_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 12,
+        "status": "assumed",
+        "note": "48XP1 qua MUX mã 12 (giả định) → ADC4_val (±7,5 V, raw/100)."
+      },
+      "xp1_49": {
+        "kind": "adc",
+        "register": "ADC3_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 13,
+        "status": "assumed",
+        "note": "49XP1 qua MUX mã 13 (giả định) → ADC3_val (±12 V, raw/100)."
+      },
+      "xp1_50": {
+        "kind": "adc",
+        "register": "ADC3_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 14,
+        "status": "assumed",
+        "note": "50XP1 qua MUX mã 14 (giả định) → ADC3_val (±12 V, raw/100)."
+      },
+      "xp1_51": {
+        "kind": "adc",
+        "register": "ADC3_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 15,
+        "status": "assumed",
+        "note": "51XP1 qua MUX mã 15 (giả định) → ADC3_val (±12 V, raw/100)."
+      },
+      "xp1_52": {
+        "kind": "adc",
+        "register": "ADC3_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 16,
+        "status": "assumed",
+        "note": "52XP1 qua MUX mã 16 (giả định) → ADC3_val (±12 V, raw/100)."
+      },
+      "xp1_56": {
+        "kind": "adc",
+        "register": "ADC3_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 17,
+        "status": "assumed",
+        "note": "56XP1 qua MUX mã 17 (giả định) → ADC3_val (±12 V, raw/100)."
+      },
+      "xp1_63": {
+        "kind": "adc",
+        "register": "ADC3_val",
+        "signed": true,
+        "scale": 0.01,
+        "offset": 0,
+        "mux": 18,
+        "status": "assumed",
+        "note": "63XP1 qua MUX mã 18 (giả định) → ADC3_val (±12 V, raw/100)."
+      }
+    }
+  }
+}

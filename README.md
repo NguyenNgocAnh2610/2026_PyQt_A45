@@ -1,176 +1,143 @@
 # Hybrid Testbench — A45
 
-Ứng dụng Python + PySide6 cho giá thử A45. Hiện có trang đăng nhập và cửa sổ chính mẫu; chưa tích hợp UART/Modbus hoặc xác thực production.
+Phần mềm giao diện và điều hành giá thử bằng Python + PySide6 (Qt Widgets + QML),
+dùng chung cho nhiều giá thử thông qua **profile JSON**. Cấu hình đầu tiên là
+**A45 / khối 1101K-10** (24 tham số). PC là Modbus RTU Master điều khiển một
+STM32 CPUv1.0 (Slave). Hiện bộ chạy bài chỉ chạy với simulator; chưa thử mạch thật.
 
-Quy trình Codex điều phối Antigravity, hiện trạng và tiến độ nằm trong
-[orchestration/](orchestration/README.md); quy tắc kỹ thuật nằm tại [AGENTS.md](AGENTS.md).
+## Tài liệu
 
-## Chạy ứng dụng
+| Tài liệu | Nội dung |
+|---|---|
+| [AGENTS.md](AGENTS.md) | Quy tắc phát triển bắt buộc (kiến trúc, an toàn giao tiếp, backup, quy trình) |
+| [PROGRESS.md](PROGRESS.md) | Hiện trạng, việc tiếp theo, vấn đề mở — nhật ký duy nhất |
+| [docs/STM32_MODBUS_PC.md](docs/STM32_MODBUS_PC.md) | Giao tiếp Modbus RTU với STM32: hai mảng, quy tắc giao dịch, bộ chạy bài, simulator |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Tham chiếu schema profile JSON |
+| [docs/CHUYEN_GIA_THU_MOI.md](docs/CHUYEN_GIA_THU_MOI.md) | Quy trình chuyển sang giá thử mới |
+| [docs/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md](docs/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md) | Tài liệu nguồn: phân tích mã firmware MCU (giữ nguyên) |
+| [docs/BAI_KIEM_TRA_1101K.md](docs/BAI_KIEM_TRA_1101K.md) | Tài liệu nguồn: các bài kiểm tra khối 1101K-10 |
 
-Chạy từ thư mục gốc, luôn dùng môi trường đã tạo:
+Nguyên tắc: mỗi nội dung chỉ nằm ở **một** tài liệu, các tài liệu khác liên kết tới.
+
+## Cài đặt và chạy
+
+Luôn dùng Conda env `qt_env`:
 
 ```powershell
 conda activate qt_env
 python -m pip install -r requirements.txt
-python main.py
+python main.py                                        # profile mặc định A45
+python main.py --profile configs/a45/system.json      # chọn profile
 ```
 
-Đăng nhập demo: `admin` / `123456`. Không sử dụng thông tin demo trong production.
-Khi chạy `main.py`, “Ghi nhớ đăng nhập” lưu **tên đăng nhập** sau khi xác thực
-thành công bằng QSettings (`A45` / `Hybrid Testbench`), không lưu mật khẩu.
-Bỏ chọn sẽ xóa tên đã lưu. Preview độc lập và gallery không ghi cấu hình người dùng.
+Nếu shell không activate được, dùng `conda run -n qt_env python ...`.
 
-## Preview và kiểm thử
+Đăng nhập demo: `admin` / `123456` (chỉ để demo). "Ghi nhớ đăng nhập" chỉ lưu
+**tên đăng nhập** bằng QSettings (namespace `A54` / `GIÁ THỬ` trong
+`src/common/config.py`). Giữ namespace ổn định khi đổi tên giá thử.
+
+## Sử dụng
+
+### Kết nối
+- **Mô phỏng** → Kết nối: bộ chạy bài dùng STM32 giả lập (chỉ đọc FC03 để xác nhận, không ghi).
+- **Modbus RTU / UART** → chọn COM, baudrate → Kết nối: mở COM thật cho **chẩn đoán**
+  (đọc một lần, màn hình Hai mảng STM32). Hướng dẫn và quy tắc: [STM32_MODBUS_PC.md mục 6](docs/STM32_MODBUS_PC.md#6-sử-dụng-trên-giao-diện-chẩn-đoán).
+- "Đã mở COM" chỉ là đã mở cổng, chưa xác nhận slave trả lời.
+
+### Chạy bài
+1. Nhập serial khối (không cần với tự kiểm tra), chọn chế độ: **Tự kiểm tra giá thử**,
+   **Kiểm tra bằng tay** (bài đang chọn) hoặc **Kiểm tra tự động** (toàn bộ bài).
+2. **Bắt đầu kiểm tra**. Mỗi bài: ghi lệnh xuống STM32 → chờ ổn định → đọc số đo →
+   so dải cho phép → về trạng thái an toàn.
+3. Nút Bắt đầu chuyển thành **Dừng** (màu đỏ) khi đang chạy; dừng kết thúc lượt
+   kiểm tra và đưa về trạng thái an toàn.
+4. **Tạm dừng** (màu vàng):
+   - Giao dịch đang dở được hoàn tất, rồi đầu ra về trạng thái an toàn. Bài đang chạy được ghi "Tạm dừng", không tính vào kết quả.
+   - Bấm **Tiếp tục** (màu xanh): bài đó chạy lại từ đầu, sau đó chạy tiếp các bài còn lại.
+   - Nếu bấm giữa hai bài thì dừng ngay. Nếu bài đang ở bước kết thúc thì bài được làm xong rồi mới dừng.
+   - Khi đang tạm dừng, bấm Dừng hoặc Ngắt kết nối sẽ kết thúc lượt (ABORTED).
+
+Kết quả: PASS, FAIL, ERROR (lỗi giao tiếp/mẫu), BLOCKED (thiếu đặc tả hoặc phần
+cứng chưa đáp ứng), SKIPPED (bài phụ thuộc chưa PASS), ABORTED, Tạm dừng (lần
+chạy bị tạm dừng, đã chạy lại). Profile A45 hiện
+cho **13 PASS mô phỏng, 11 BLOCKED → "Chưa đầy đủ"**
+(chi tiết: [CONFIGURATION.md](docs/CONFIGURATION.md#hiện-trạng-profile-a45--khối-1101k-10)).
+
+### Màn hình
+- Vùng trạng thái/số đo dựng từ danh mục tín hiệu, lọc theo nhóm/bài. Lọc hay chọn
+  bài để xem không đổi bài đang chạy; **Theo dõi bài chạy** để quay lại.
+- Mỗi ô **giữ giá trị gần nhất** sau khi bài xong (mô phỏng và thật), kèm chip kết
+  quả và "bài/bước · giờ".
+  - Số đo: PASS / FAIL / Chưa đánh giá.
+  - Giá trị yêu cầu: chip **ACK**, nghĩa là MCU đã nhận lệnh, chưa xác nhận đầu ra.
+  - Giá trị trực tiếp hiện màu xanh lam với nhãn "Hiện thời"; giá trị đã lưu không bao giờ được ghi là hiện thời.
+  - Giá trị lưu được thay khi tín hiệu được đo lại, và xóa khi bấm **Phiên mới**.
+- "Quan sát tín hiệu": đồ thị Analog/PWM là **dữ liệu demo** (luôn ghi MÔ PHỎNG),
+  không dùng để đánh giá; nút Tạm dừng chỉ dừng nguồn demo của đồ thị.
+- **Cài đặt**: kịch bản lỗi mô phỏng và tốc độ thời gian ×1/×10/×60 (chỉ rút ngắn thời gian chờ trong mô phỏng).
+- Tổng quan, Lịch sử, In / Xuất file hiện là trang chờ; chưa có camera.
+- Thông báo lỗi dùng hộp thoại không chặn, không lặp theo mỗi chu kỳ cập nhật.
+
+### Lưu phiên
+Phiên tự lưu dạng JSON tại thư mục dữ liệu người dùng (hiển thị trong Cài đặt),
+ghi nguyên tử trong worker. Mỗi phiên có snapshot cấu hình, cờ mô phỏng, từng lần
+thử, số đo, giới hạn và các lệnh đã ACK. Lỗi lưu: dữ liệu giữ trong bộ nhớ, có
+nút **Lưu lại kết quả**. Phiên dở sau khi tắt máy được đánh dấu gián đoạn, không
+tự chạy tiếp. **Phiên mới** không reset phần cứng.
+
+## Kiểm thử và preview
 
 ```powershell
-python -m tests.preview_login
-python -m tests.preview_widgets
-python -m tests.preview_main
-python -m unittest discover -s tests -v
-```
-
-Nếu không activate được trong shell, dùng `conda run -n qt_env python ...`.
-
-## Giao diện đăng nhập
-
-Login dùng nguyên ảnh `assets/images/login.png` làm nền, các nhãn và điều khiển
-Qt thật phủ đúng vị trí trên ảnh. Cửa sổ cố định khoảng 1280 × 720; khi khởi tạo
-sẽ thu nhỏ theo vùng màn hình khả dụng (Qt logical pixels), chừa chỗ cho khung
-cửa sổ. Không kéo giãn/phóng to cửa sổ Login. Trong gallery, dùng thanh cuộn
-nếu vùng preview nhỏ hơn trang.
-
-`login_page.py` đặt tọa độ theo ảnh gốc 1672 × 941. `login.qss` giữ màu sắc,
-font và các trạng thái hover/focus/pressed; giá trị `px` của QSS riêng được
-`prepare_page_style()` đổi theo property `styleScale`, cả ở ứng dụng và gallery.
-`common.qss` vẫn là theme nền và không bị đổi kích thước theo Login.
-Đổi ảnh nền sang bố cục khác cần cập nhật tọa độ điều khiển tương ứng.
-
-“Quên mật khẩu?” và “Hỗ trợ” mở hướng dẫn tại chỗ; chưa có dịch vụ đặt lại mật
-khẩu hoặc địa chỉ liên hệ cấu hình. Xác thực hiện vẫn là demo.
-
-Hai hộp thoại trợ giúp dùng lớp `InformationDialog` nhỏ ngay trong
-`login_page.py`; style cũng nằm cuối `login.qss`. Hộp thoại có icon, nội dung,
-vùng lưu ý và nút “Đã hiểu”, mở bất đồng bộ và đóng bằng Enter/Esc. Đây là
-thành phần riêng của Login nên không tạo thêm module UI/QSS/preview độc lập.
-
-### Quản lý nhãn và nội dung
-
-| Phạm vi | Nơi chỉnh |
-|---|---|
-| Tên ứng dụng, phiên bản và mã giá thử dùng toàn hệ thống | `src/common/config.py`: `APP_NAME`, `APP_VERSION`, `TESTBENCH_MODEL` |
-| Tiêu đề/miêu tả có thể đổi khi dùng giao diện cho giá thử khác | `LoginBrandText` ở đầu `src/ui/widgets/login_page.py` |
-
-Các nhãn phổ thông như “Tên đăng nhập”, “Mật khẩu”, placeholder, tooltip và
-thông báo xác thực được viết trực tiếp tại widget/logic sử dụng. Chỉ tách hằng
-số khi nội dung cần cấu hình theo giá thử hoặc được dùng thực sự trên nhiều UI.
-Không thay `APP_NAME`/`SETTINGS_ORGANIZATION` chỉ để đổi nhãn quảng bá, vì chúng
-cũng định danh nơi lưu QSettings hiện tại.
-
-Chụp một kích thước cụ thể, độc lập với màn hình hiện tại:
-
-```powershell
+python -B -m unittest discover -s tests -v          # toàn bộ test (không mở COM thật)
+python -B -m unittest tests.test_stm32_bench -v     # một module
+python -m tests.preview_main --state finished --capture captures/main_finished.png
+python -m tests.preview_main --profile configs/a45/system.json
+python -m tests.preview_stm32                       # màn hình hai mảng, giả lập
 python -m tests.preview_login --width 1280 --capture captures/login.png
-python -m tests.preview_login --width 960 --capture captures/login_compact.png
+python -m tests.preview_widgets                     # gallery widget/QSS
 ```
 
-## Từ điển giao diện
+Preview dùng UI thật với dữ liệu giả, chỉ lưu thư mục tạm, không mở COM và không
+ghi cài đặt người dùng.
 
-`python -m tests.preview_widgets` mở gallery với danh mục tìm kiếm bên trái,
-preview tương tác, nội dung QSS và ví dụ cách dùng bên phải. Có thể tìm bằng
-tiếng Việt có/không dấu hoặc tên lớp Qt như `QPushButton`.
+## Phát triển giao diện
 
-- Nhóm widget dùng chung minh họa nút, input, lựa chọn, bảng/cây/danh sách,
-  tab, progress/slider và nhãn trạng thái/card. Các mẫu ở `tests/widget_samples.py`.
-- Nhóm trang dùng đúng `LoginPage` và `MainWindow`, với dữ liệu demo.
-- Gallery tự quét `assets/styles/` và thư mục con, cập nhật khi thêm/sửa/đổi tên/xóa
-  QSS (kể cả cách lưu bằng thay thế file của editor). Có nút **Quét lại**.
-- `common.qss` áp dụng ở cấp ứng dụng. QSS trang chỉ áp dụng trong preview đó.
-  Khi tải lại QSS của trang đang xem, giữ nguyên widget và dữ liệu đang nhập.
-- QSS chưa liên kết UI vẫn có mục riêng và bộ widget mẫu. Selector theo
-  `objectName`/property riêng chỉ thể hiện chính xác khi có UI tương ứng.
-- Thay đổi Python hoặc bảng đăng ký cần khởi động lại gallery. QSS không hợp lệ
-  về cú pháp được Qt báo trong terminal; gallery không có trình kiểm tra cú pháp QSS.
+### Tổ chức code
+- `main.py`: Login → MainWindow, đọc `--profile`.
+- `src/ui/`: `main_window.py`, `widgets/` (Login, thanh kết nối, hai mảng STM32, đồ thị), `qml/SignalDashboard.qml`.
+- `src/backend.py`: trạng thái duy nhất và bộ chạy bài; `src/device.py`, `src/protocol.py`,
+  `src/communication.py`, `src/simulator.py`: thiết bị, codec, I/O serial, giả lập
+  (xem [STM32_MODBUS_PC.md](docs/STM32_MODBUS_PC.md)).
+- `src/common/`: cấu hình, profile/validator, bản đồ STM32, model, style. `src/storage.py`: lưu phiên.
+- `configs/<gia_thu>/`: profile JSON. `tests/`: test tự động và preview.
 
-Preview nằm trong vùng cuộn để giữ kích thước tối thiểu của trang. Để kiểm tra
-resize, focus và đóng/mở ở cửa sổ thật, chạy preview độc lập.
-Lệnh `python -m tests.preview_widgets --capture captures` vẫn xuất
-`widgets.png`, `login.png`, `login_minimum.png` (bản cố định rộng 960) và `main.png`.
+### Login
+- Nền là ảnh `assets/images/login.png` (gốc 1672 × 941); điều khiển Qt đặt theo tọa độ ảnh trong `login_page.py`.
+- Cửa sổ ~1280 × 720, thu nhỏ theo màn hình, không phóng to.
+- `login.qss` chứa màu/trạng thái; giá trị `px` co theo property `styleScale` (`prepare_page_style()`). Đổi ảnh nền cần cập nhật tọa độ.
+- "Quên mật khẩu?"/"Hỗ trợ" mở `InformationDialog` tại chỗ; xác thực hiện là demo.
+- Nhãn đổi theo giá thử: `APP_NAME`, `APP_VERSION`, `TESTBENCH_MODEL` (`src/common/config.py`), `LoginBrandText` (`login_page.py`).
+- Không đổi `APP_NAME`/`SETTINGS_ORGANIZATION` chỉ để đổi nhãn, vì chúng định danh nơi lưu QSettings.
 
-### Thêm một trang vào gallery
+### Theme
+- Gọi `apply_theme(app)` (`src/common/styles.py`) sau khi tạo `QApplication`; QSS trang dùng `apply_page_style(widget, "login")`.
+- `common.qss` là nền chung; QSS trang chỉ ghi đè phần riêng; không import QSS trong QSS.
+- `@ASSETS@` trong QSS được đổi thành đường dẫn tuyệt đối.
+- Property dùng chung:
+  - Nút: `variant` = `primary` / `danger` / `text`.
+  - Nhãn: `role` = `title` / `muted`.
+  - Card: `QFrame` với `role` = `card`.
+  - Trạng thái lúc chạy: `set_state(label, "success" | "warning" | "error")`.
+- QML có bảng màu riêng, tương ứng với theme Widgets.
 
-Mỗi trang có một file `tests/preview_<trang>.py` theo mẫu `tests/preview_login.py`:
+### Gallery (`python -m tests.preview_widgets`)
+- Danh mục tìm kiếm (có/không dấu, tên lớp Qt); preview tương tác kèm QSS và ví dụ.
+- Tự quét `assets/styles/` khi thêm/sửa/xóa QSS; nút **Quét lại**.
+- Thay đổi Python cần khởi động lại gallery.
+- `--capture captures` xuất `widgets.png`, `login.png`, `login_minimum.png`, `main.png`.
 
-```python
-import sys
-from pathlib import Path
-from PySide6.QtWidgets import QApplication
-from src.common.config import ASSETS_DIR
-from src.common.styles import apply_theme
-# Import lớp UI thật và backend giả của trang tại đây.
-
-
-def create_preview(assets_dir: Path = ASSETS_DIR):
-    # Trả về widget mới, truyền dữ liệu/backend giả và assets_dir nếu cần.
-    # Ví dụ với trang đã có:
-    from tests.preview_login import create_preview as create_login
-    return create_login(assets_dir)
-
-
-def main() -> int:
-    app = QApplication(sys.argv)
-    apply_theme(app)
-    page = create_preview()
-    page.show()
-    return app.exec()
-
-
-if __name__ == "__main__":
-    sys.exit(main())
-```
-
-Import factory và thêm một `PagePreview` vào `PAGE_PREVIEWS` trong
-`tests/preview_widgets.py`. Ví dụ khai báo Login hiện có:
-
-```python
-PagePreview(
-    title="Login",
-    stylesheet="login.qss",  # Đường dẫn tương đối trong assets/styles/
-    factory=create_login_preview,
-    source="src/ui/widgets/login_page.py",
-    usage="python -m tests.preview_login",
-)
-```
-
-Dùng `stylesheet=None` nếu trang chỉ dùng theme chung. Với file Qt Designer
-`.ui` sau này, factory tạo lớp UI đã được load/setup từ file đó rồi trả về widget;
-gallery vẫn dùng cùng giao diện factory, không tự import hay thực thi file mới.
-
-`create_preview()` không tạo `QApplication`, không chạy event loop, không gọi
-`show()` và không mở phần cứng. `main()` chỉ phục vụ chạy độc lập. UI ứng dụng
-trong `src/` không import từ `tests/`. Preview có timer/worker phải tự dừng chúng
-trong `closeEvent`, vì gallery đóng và giải phóng preview khi chuyển mục.
-
-## Tổ chức code
-
-- `main.py`: luồng Login → MainWindow.
-- `src/ui/widgets/login_page.py`: widget đăng nhập, nhận callback xác thực nhanh, không chặn GUI. Xác thực từ xa sau này cần API bất đồng bộ.
-- `src/ui/main_window.py`: cửa sổ chính mẫu.
-- `src/common/`: cấu hình, đường dẫn tài nguyên và tiện ích style.
-- `assets/styles/common.qss`: theme chung Qt Widgets; `login.qss`: tùy chỉnh riêng trang Login.
-- `assets/images/`: ảnh nền `login.png` cần thiết cho Login và các icon SVG.
-- `tests/`: test tự động và preview độc lập.
-
-Chưa tạo module phần cứng và QML rỗng; bổ sung khi triển khai tính năng.
-
-## Dùng theme
-
-Gọi `apply_theme(app)` từ `src.common.styles` sau khi tạo `QApplication`; trang dùng `apply_page_style(widget, "login")`. Theme chung được nạp ở cấp ứng dụng, QSS trang ở cấp widget; không import QSS trong QSS.
-
-Đường dẫn icon `@ASSETS@` trong QSS chung được loader đổi thành đường dẫn tuyệt đối, nên tài nguyên không phụ thuộc thư mục chạy.
-
-- Nút: `setProperty("variant", "primary")`, `"danger"` hoặc `"text"`.
-- Nhãn: `setProperty("role", "title")` hoặc `"muted"`.
-- Card: `QFrame` với `setProperty("role", "card")`.
-- Trạng thái đổi lúc chạy: `set_state(label, "success")`, `"warning"`, `"error"`.
-
-Theme gồm input, combobox, spinbox, checkbox/radio, bảng/cây/danh sách, tab, progress, slider, scrollbar và menu. QML sẽ dùng theme riêng khi được tích hợp.
+Thêm một trang:
+1. Tạo `tests/preview_<trang>.py` theo mẫu `tests/preview_login.py`. `create_preview()` trả widget mới; nó không tạo `QApplication`, không `show()`, không mở phần cứng.
+2. Thêm `PagePreview(title, stylesheet, factory, source, usage)` vào `PAGE_PREVIEWS` trong `tests/preview_widgets.py` (`stylesheet=None` nếu chỉ dùng theme chung).
+3. Preview có timer/worker phải tự dừng trong `closeEvent`.
+4. `src/` không import `tests/`.
