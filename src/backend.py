@@ -21,14 +21,20 @@ from src.storage import SessionStore
 
 
 def evaluate(check, sample, now, stale_ms):
-    """Pure verdict calculation, independent of protocol and Widgets."""
-    if sample is None or sample.quality != "valid" or (now - sample.timestamp) * 1000 > stale_ms:
+    """Pure verdict calculation, independent of protocol and Widgets.
+
+    ``quality == "default"``: the operator left a manual entry empty and the
+    nominal value was recorded instead; it is judged like a value but the
+    caller labels it "mặc định, chưa đo". ``absolute`` compares |value|.
+    """
+    if sample is None or sample.quality not in ("valid", "default") or (now - sample.timestamp) * 1000 > stale_ms:
         return "ERROR", "Mẫu thiếu, lỗi hoặc hết hạn"
     nominal, tolerance = check.get("nominal"), check.get("tolerance")
     if nominal is None or tolerance is None:
         return "Chưa đánh giá", "Tiêu chuẩn chưa đủ giá trị/dung sai"
+    value = abs(sample.value) if check.get("absolute") else sample.value
     lower, upper = nominal - tolerance, nominal + tolerance
-    inside = lower <= sample.value <= upper or math.isclose(sample.value, lower, rel_tol=0, abs_tol=1e-10) or math.isclose(sample.value, upper, rel_tol=0, abs_tol=1e-10)
+    inside = lower <= value <= upper or math.isclose(value, lower, rel_tol=0, abs_tol=1e-10) or math.isclose(value, upper, rel_tol=0, abs_tol=1e-10)
     return ("PASS", "Trong giới hạn") if inside else ("FAIL", "Ngoài giới hạn")
 
 
@@ -42,6 +48,8 @@ class Backend(QObject):
     monitor_changed = Signal()
     shutdown_ready = Signal()
     stm32_changed = Signal()
+    # Emitted when manual_request appears or disappears (operator entry).
+    manual_input_changed = Signal()
 
     def __init__(self, profile=None, username="demo", storage_dir=None, parent=None):
         super().__init__(parent)
@@ -79,6 +87,9 @@ class Backend(QObject):
         # 'stm32': runner writes/reads the two CPUv1.0 banks; 'mock': legacy A45 v1.
         self.adapter = self.profile.hardware["adapter"]
         self.bench_token = None
+        # Pending operator entry (e.g. frequency read on an oscilloscope).
+        self.manual_request = None
+        self._manual_frozen = (0.0, {})  # (capture time, bench samples) of the waiting step.
         self.device.bench_completed.connect(self._bench_completed)
         self.device.stm32_snapshot.connect(self._stm32_snapshot)
         self.serial_detail = ''
@@ -87,6 +98,9 @@ class Backend(QObject):
         self.device.serial_connection.status_changed.connect(self._serial_status)
         self.device.serial_connection.read_finished.connect(self._serial_read_finished)
         self.device.serial_connection.received.connect(self._uart_received)
+        self.device.virtual_connection.status_changed.connect(self._virtual_status)
+        for link, simulation in ((self.device.serial_connection, False), (self.device.virtual_connection, True)):
+            link.frame_logged.connect(lambda direction, raw, sim=simulation: self._frame_logged(sim, direction, raw))
         self.device.controller_completed.connect(self._controller_received)
         self.mode = Mode.AUTO
         self.selected_id = self.profile.tests[0]["id"]
@@ -240,7 +254,9 @@ class Backend(QObject):
                 self.connection = "Chưa kết nối"
                 self.message = "Chờ giao dịch STM32 chẩn đoán kết thúc rồi kết nối lại."
             else:
+                # Same Modbus RTU path as a real COM port, on the virtual port.
                 self.bench_token = str(uuid.uuid4())
+                self.message = "Mở COM ảo, gửi FC03 tới STM32 giả lập…"
                 self.device.bench_connect(self.bench_token)
         else:
             self.device.connect_device(self.epoch)
@@ -289,6 +305,27 @@ class Backend(QObject):
             self._invalidate()
         self.message = self.serial_detail or self.connection
         self.changed.emit()
+
+    def _virtual_status(self, state, detail):
+        """The virtual COM port closed by itself (timeout / unplug), like a real port."""
+        if state not in ('error', 'disconnected'):
+            return
+        if self.stm32.source and self.stm32.source[0]:
+            self.stm32.invalidate()
+            self.stm32.message = detail or 'COM ảo đã đóng; dữ liệu STM32 không còn hiệu lực.'
+            self.stm32_changed.emit()
+        if (state == 'error' and self.connection_adapter == 'mock' and self.adapter == 'stm32'
+                and self.connection in ("Sẵn sàng · MÔ PHỎNG", "Đang xác minh mô phỏng")):
+            self.connection = "Mất kết nối COM ảo · cần kết nối lại"
+            self.message = detail
+            self._invalidate()
+            self.changed.emit()
+
+    def _frame_logged(self, simulation, direction, raw):
+        frames = self.stm32.frames.setdefault(simulation, {})
+        if direction == 'TX':
+            frames.clear()
+        frames[direction] = bytes(raw)
 
     def stage_stm32(self, address, values):
         words = stm32_write_words(address, values)
@@ -453,6 +490,7 @@ class Backend(QObject):
         self.bench_token = None
         self.device.communication.disconnect()
         self.device.close_serial()
+        self.device.close_virtual()
         self.stm32.invalidate()
         self.stm32.message = 'Đã ngắt; cần đọc lại STM32.'
         self.stm32_changed.emit()
@@ -570,7 +608,66 @@ class Backend(QObject):
             self.attempt["completed"] = True
             self.session["processed"] += 1
 
+    def _clear_manual_request(self):
+        if self.manual_request is not None:
+            self.manual_request = None
+            self.manual_input_changed.emit()
+
+    def _manual_checks(self, step):
+        """Checks the operator enters by hand (stm32 ``manual`` inputs)."""
+        if self.adapter != "stm32":
+            return []
+        inputs = self.profile.hardware["stm32_io"]["inputs"]
+        return [c for c in step["checks"] if inputs.get(c["signal"], {}).get("kind") == "manual"]
+
+    def _request_manual(self, step, checks):
+        inputs = self.profile.hardware["stm32_io"]["inputs"]
+        self.phase = "awaiting_input"
+        # The bench readings of this step were taken now. Freeze them: the
+        # operator may take minutes, after which they would count as stale.
+        # They are judged at their own capture time, never re-read or reused.
+        self._manual_frozen = (time.monotonic(), {c["signal"]: self.samples.get(c["signal"])
+                                                  for c in step["checks"] if c not in checks})
+        self.manual_request = {
+            "token": self.token, "test_id": self.test["id"], "step_id": step["id"], "title": step["title"],
+            "fields": [{"signal": c["signal"], "label": self.definitions[c["signal"]]["label"], "unit": c["unit"],
+                        "nominal": c["nominal"], "tolerance": c["tolerance"],
+                        "prompt": inputs[c["signal"]].get("prompt", "")} for c in checks]}
+        self.message = (f"{self.test['id']} / {step['id']} · Chờ người vận hành nhập "
+                        + ", ".join(f["label"] for f in self.manual_request["fields"]))
+        self.manual_input_changed.emit()
+
+    def submit_manual(self, values):
+        """Operator entry for the pending request: ``{signal: number | None}``.
+
+        Empty (None/missing) records the nominal value with quality "default"
+        so the report says it was not measured.
+        """
+        request = self.manual_request
+        if self.phase != "awaiting_input" or request is None or request["token"] != self.token:
+            return False
+        now = time.monotonic()
+        samples = {}
+        for field in request["fields"]:
+            value = values.get(field["signal"])
+            if value is None:
+                samples[field["signal"]] = Sample(field["nominal"], now, "default", "manual-default")
+            elif isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+                samples[field["signal"]] = Sample(float(value), now, "valid", "manual")
+            else:
+                raise ValueError(f"Giá trị nhập cho {field['label']} không hợp lệ.")
+        self.samples.update(samples)
+        self.signal_model.refresh(self.samples)
+        self.samples_changed.emit()
+        self._clear_manual_request()
+        self.phase = "sampling"
+        measured_at, frozen = self._manual_frozen
+        self._evaluate_step(now, judged={sid: (sample, measured_at) for sid, sample in frozen.items()})
+        self.changed.emit()
+        return True
+
     def _issue(self, operation):
+        self._clear_manual_request()
         self.token = str(uuid.uuid4())
         self.confirmed = None
         self.phase = operation + "_ack"
@@ -619,9 +716,13 @@ class Backend(QObject):
 
     def _measure_stm32(self, now):
         step = self.test["steps"][self.step_index]
+        manual = self._manual_checks(step)
+        signals = [c["signal"] for c in step["checks"] if c not in manual]
+        if not signals:
+            return  # Hold step or operator entry only: nothing to read.
         self.bench_token = str(uuid.uuid4())
         try:
-            count = self.device.bench_measure(self.bench_token, [c["signal"] for c in step["checks"]])
+            count = self.device.bench_measure(self.bench_token, signals)
         except ValueError as error:
             self.bench_token = None
             self._fatal(str(error))
@@ -639,8 +740,8 @@ class Backend(QObject):
             else:
                 self.connection = "Sẵn sàng · MÔ PHỎNG"
                 self._store_bench_samples(result)
-                self.message = ("MÔ PHỎNG · STM32 đã trả lời FC03. Ánh xạ thanh ghi là giả định theo CPUv1.0; "
-                                "MCU không có tín hiệu bảo vệ.")
+                self.message = ("MÔ PHỎNG · STM32 giả lập đã trả lời FC03 qua COM ảo (khung Modbus RTU + CRC). "
+                                "Ánh xạ thanh ghi là giả định theo CPUv1.0; MCU không có tín hiệu bảo vệ.")
             self.changed.emit()
             return
         if error:
@@ -756,6 +857,14 @@ class Backend(QObject):
                 else:
                     self.attempt["status"] = self.attempt.pop("provisional_status", "PASS")
                     self._count_attempt()
+                    if self.attempt["status"] == "FAIL" and self.test.get("stop_on_fail"):
+                        # e.g. wrong supply current: likely a short; do not
+                        # stimulate the unit further. Outputs are already safe.
+                        self.queue.clear()
+                        self.session["stopped_by"] = self.test["id"]
+                        self.session["events"].append({"at": utc_now(), "event": "stop_on_fail",
+                                                       "test_id": self.test["id"]})
+                        self.attempt["reason"] = "FAIL ở bài nguồn: dừng cả lượt, đầu ra đã về an toàn"
                 self._checkpoint()
                 if self.stopping:
                     self._finish_session(aborted=True)
@@ -775,8 +884,13 @@ class Backend(QObject):
                     self._measure_stm32(now)
         elif self.phase == "sampling":
             step = self.test["steps"][self.step_index]
-            if all(self.samples.get(c["signal"], Sample()).timestamp >= self.capture_after for c in step["checks"]):
-                self._evaluate_step(now)
+            manual = self._manual_checks(step)
+            if all(self.samples.get(c["signal"], Sample()).timestamp >= self.capture_after
+                   for c in step["checks"] if c not in manual):
+                if manual:
+                    self._request_manual(step, manual)  # Outputs stay applied while the operator measures.
+                else:
+                    self._evaluate_step(now)
             elif now >= self.deadline:
                 self._fatal("Không có mẫu mới hợp lệ sau thời gian ổn định")
         self.changed.emit()
@@ -789,15 +903,24 @@ class Backend(QObject):
         """
         at = datetime.now().strftime("%H:%M:%S")
         for action in actions:
+            if action["value"] is None:
+                self.measurement_history.pop(action["signal"], None)  # Contact opened.
+                continue
             self.measurement_history[action["signal"]] = {
                 "value": action["value"], "status": "ACK", "test_id": self.test["id"], "step_id": step_id,
                 "at": at, "source": "request"}
 
-    def _evaluate_step(self, now):
+    def _evaluate_step(self, now, judged=None):
+        """``judged``: {signal: (sample, time)} for readings frozen before an
+        operator entry; each is judged at its own capture time."""
         step = self.test["steps"][self.step_index]
+        judged = judged or {}
         for check in step["checks"]:
-            sample = self.samples.get(check["signal"])
-            status, reason = evaluate(check, sample, now, self.definitions[check["signal"]]["stale_ms"])
+            sample, at = judged.get(check["signal"], (self.samples.get(check["signal"]), now))
+            status, reason = evaluate(check, sample, at, self.definitions[check["signal"]]["stale_ms"])
+            if sample is not None and sample.quality == "default" and status != "ERROR":
+                reason += " · mặc định, chưa đo (không nhập)"
+                self.attempt["defaults_used"] = True
             self.attempt["measurements"].append({**check, "step_id": step["id"], "step_title": step["title"],
                 "value": sample.value if sample else None, "quality": sample.quality if sample else "unknown",
                 "timestamp": utc_now(), "status": status, "reason": reason})
@@ -884,6 +1007,7 @@ class Backend(QObject):
         # unknown and hardware commands are never resent automatically.
         self.device.cancel_bench()
         self.bench_token = None
+        self._clear_manual_request()
         self.pause_requested = False
         self.device.communication.disconnect()
         self._poll.stop()
@@ -905,9 +1029,15 @@ class Backend(QObject):
         self.pause_requested = False
         statuses = [a["status"] for a in self.session["attempts"] if a["status"] != "PAUSED"]
         verdict = "ABORTED" if aborted else "ERROR" if "ERROR" in statuses else "FAIL" if "FAIL" in statuses else "Chưa đầy đủ" if any(s != "PASS" for s in statuses) else "PASS"
-        self.session.update(state="finished", verdict=verdict, ended_at=utc_now())
+        defaults = any(a.get("defaults_used") for a in self.session["attempts"])
+        self.session.update(state="finished", verdict=verdict, ended_at=utc_now(), defaults_used=defaults)
         self.phase = "idle"
-        self.message = f"Kết thúc · {verdict} · Kết quả MÔ PHỎNG"
+        notes = ""
+        if self.session.get("stopped_by"):
+            notes += f" · Dừng cả lượt vì {self.session['stopped_by']} FAIL"
+        if defaults:
+            notes += " · Có giá trị mặc định chưa đo"
+        self.message = f"Kết thúc · {verdict}{notes} · Kết quả MÔ PHỎNG"
         self._checkpoint()
         if self.shutdown_requested:
             self._close()
@@ -935,6 +1065,7 @@ class Backend(QObject):
         self.device.cancel_bench()
         self.bench_token = None
         self.device.close_serial()
+        self.device.close_virtual()
         self.stm32.invalidate()
         self.stm32_changed.emit()
         self.device.communication.disconnect()

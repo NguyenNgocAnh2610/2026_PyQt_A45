@@ -35,7 +35,8 @@ def main() -> int:
     parser.add_argument("--capture", type=Path)
     parser.add_argument("--width", type=int, default=1560)
     parser.add_argument("--height", type=int, default=940)
-    parser.add_argument("--state", choices=("idle", "running", "paused", "finished", "stale"), default="idle")
+    parser.add_argument("--state", choices=("idle", "running", "paused", "finished", "stale", "manual"), default="idle",
+                        help="manual = P01 tới hộp thoại nhập tần số; các trạng thái khác tự bỏ qua nhập tay")
     parser.add_argument("--scenario", choices=SCENARIOS, default="normal")
     parser.add_argument("--connection", choices=('mock', 'rtu', 'uart'), default='mock',
                         help='Preview lựa chọn kết nối; không tự mở COM')
@@ -57,18 +58,26 @@ def main() -> int:
     elapsed = 0
     started = False
 
+    if args.state != "manual":
+        # Demo operator: leave manual entries empty (nominal, "mặc định, chưa đo").
+        backend.manual_input_changed.connect(
+            lambda: backend.manual_request and QTimer.singleShot(300, lambda: backend.submit_manual({})))
+
     def capture():
         nonlocal elapsed, started
         elapsed += 100
         if args.state != "idle" and not started and backend.connection == "Sẵn sàng · MÔ PHỎNG":
             backend.configure(mode=Mode.AUTO if args.state in ("finished", "paused") else Mode.MANUAL,
-                              serial_number="DEMO-1101K-001", time_scale=1.0 if args.state == "paused" else 10.0)
+                              serial_number="DEMO-1101K-001",
+                              time_scale=1.0 if args.state == "paused" else 60.0 if args.state == "manual" else 10.0)
             window.serial_edit.setText(backend.serial_number)
-            backend.select_test("P04" if any(t['id'] == 'P04' for t in backend.tests) else backend.tests[0]['id'])
+            first = "P01" if args.state == "manual" else "P04"
+            backend.select_test(first if any(t['id'] == first for t in backend.tests) else backend.tests[0]['id'])
             window._follow()
             backend.start()
             started = True
         ready = args.state == "idle" and elapsed >= 500
+        ready |= args.state == "manual" and window._manual_dialog is not None and window._manual_dialog.isVisible()
         ready |= args.state == "running" and started and backend.busy and bool(backend.samples)
         ready |= args.state == "finished" and started and not backend.busy
         if args.state == "paused" and started and backend.phase == "settling" and len(backend.session["attempts"]) >= 5:
@@ -82,6 +91,8 @@ def main() -> int:
             args.capture.parent.mkdir(parents=True, exist_ok=True)
             app.processEvents()
             target = window.connection_bar.details if args.connection_details else window
+            if args.state == "manual" and window._manual_dialog is not None:
+                target = window._manual_dialog
             if not target.grab().save(str(args.capture)):
                 raise RuntimeError("Không lưu được ảnh preview")
             print(f"Captured {args.capture}; state={backend.phase}".encode('ascii', 'backslashreplace').decode('ascii'))

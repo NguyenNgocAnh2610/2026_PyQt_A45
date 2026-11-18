@@ -20,6 +20,7 @@ from src.common.profiles import specification_issues
 from src.ui.widgets.connection_bar import ConnectionBar
 from src.ui.widgets.signal_monitor import SignalMonitor
 from src.ui.widgets.navigation_stack import NavigationStack
+from src.ui.widgets.manual_input import ManualInputDialog
 
 
 STATUS_TEXT = {'PAUSED': 'Tạm dừng'}
@@ -61,6 +62,8 @@ class MainWindow(QMainWindow):
         apply_page_style(self, 'main', self.assets_dir)
         self.backend.changed.connect(self.refresh)
         self.backend.shutdown_ready.connect(self._shutdown_ready)
+        self._manual_dialog = None
+        self.backend.manual_input_changed.connect(self._manual_input_changed)
         self.clock = QTimer(self)
         self.clock.setInterval(1000)
         self.clock.timeout.connect(self._clock)
@@ -411,6 +414,30 @@ class MainWindow(QMainWindow):
         else:
             self.backend.pause()
 
+    def _manual_input_changed(self):
+        request = self.backend.manual_request
+        dialog = self._manual_dialog
+        if dialog is not None and (request is None or request['token'] != dialog.token):
+            self._manual_dialog = None
+            dialog.withdraw()
+        if request is not None and self._manual_dialog is None and not self._closing:
+            dialog = ManualInputDialog(request, self)
+            dialog.submitted.connect(self._manual_submitted)
+            dialog.finished.connect(lambda _, d=dialog: setattr(self, '_manual_dialog', None)
+                                    if self._manual_dialog is d else None)
+            self._manual_dialog = dialog
+            dialog.open()
+
+    def _manual_submitted(self, token, values):
+        request = self.backend.manual_request
+        if request is None or request['token'] != token:
+            return  # The run moved on (stop/pause/error); ignore the late answer.
+        self._manual_dialog = None  # The dialog closes itself after sending.
+        try:
+            self.backend.submit_manual(values)
+        except ValueError as error:
+            self._notify('Giá trị nhập không hợp lệ', str(error))
+
     def _new_session(self):
         if not self.backend.new_session():
             self._notify('Chưa thể tạo phiên mới', self.backend.message)
@@ -604,4 +631,4 @@ class MainWindow(QMainWindow):
 
     def _shutdown_ready(self):
         if self._closing:
-            QTimer.singleShot(0, self.close)
+            QTimer.singleShot(0, self, self.close)  # Context: dropped if the window is gone.

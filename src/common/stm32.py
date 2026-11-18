@@ -104,6 +104,9 @@ class Stm32RegisterBanks:
     read_valid: bool = False
     received_at: float = 0.0
     last_ack: object = None  # Receipt of captured request, not output state.
+    # Last RTU frames per source {simulation: {'TX': bytes, 'RX': bytes}},
+    # rebuilt from the PDU with a recomputed CRC (Qt hides raw bytes).
+    frames: dict = field(default_factory=dict)
     message: str = 'Chưa đọc STM32; mảng ghi chỉ là bản nháp.'
 
     def invalidate(self):

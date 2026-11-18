@@ -16,7 +16,9 @@ phần mềm hoàn thiện (mục 9).
 
 Gom đủ tài liệu trước khi làm: danh sách bài đo, sơ đồ chân, bản đồ thanh ghi,
 hệ số đo/DAC, trình tự cấp/ngắt nguồn. Thông số chưa biết thì ghi lại; **không
-lấy thông số của giá thử cũ áp sang**.
+lấy thông số của giá thử cũ áp sang**. Cách làm đã dùng cho A45: lập một phiếu hỏi
+tạm trong `docs/` (mỗi mục có phương án gợi ý), người phụ trách phần cứng điền, rồi
+chuyển kết quả vào JSON và xóa phiếu.
 
 ## 2. Tạo thư mục profile
 
@@ -30,11 +32,21 @@ lấy thông số của giá thử cũ áp sang**.
 |---|---|---|---|
 | 3.1 | `system.json` | `id`, `name`, `subtitle`; khai báo **mọi** tín hiệu (đo, lệnh, trạng thái) với đơn vị đúng; `status_signals`; bài tự kiểm tra `diagnostics` | CONFIGURATION → system.json |
 | 3.2 | File đối tượng | `id`, `name`, `version`; chép **nguyên văn** tài liệu vào `source_paragraphs`; `sequences` (chuẩn bị/kết thúc, ghi `basis`); từng bài/bước với `actions`, `wait_ms`, `checks` (`nominal`, `tolerance`) | CONFIGURATION → File đối tượng |
-| 3.3 | `hardware.json` | Mỗi tín hiệu dùng trong `actions`/`checks`/`sequences` có mục `stm32_io`: bit rơ-le, DAC + định tuyến, kênh ADC + mã MUX. Mục chưa đo kiểm để `assumed`; mục phần cứng không làm được để `unsupported` + `reason`. Thêm tín hiệu mới vào `wire_signals` | CONFIGURATION → hardware.json |
-| 3.4 | `mock.json` | `stm32_cases`: "khi các lệnh X đang bật thì khối trả Y" (dữ liệu demo, độc lập với dải tiêu chuẩn) | CONFIGURATION → mock.json |
+| 3.3 | `hardware.json` | Mỗi tín hiệu dùng trong `actions`/`checks`/`sequences` có mục `stm32_io`. **Phân bổ bit** (mục 3a): rơ-le nguồn và lệnh bật/tắt là output `bit`; chân nhận nhiều mức đi qua bo matrix (`matrix_boards` + `sources`); đo qua MUX (số kênh) vào ADC; số đo ngoài nhập tay là input `manual`. Mục chưa đo kiểm để `assumed`; mục phần cứng không làm được để `unsupported` + `reason`. Thêm tín hiệu mới vào `wire_signals` | CONFIGURATION → hardware.json |
+| 3.4 | `mock.json` | `stm32_cases`: "khi các lệnh X đang bật thì khối trả Y" (dữ liệu demo, độc lập với dải tiêu chuẩn). `stm32_timing.loop_ms` = chu kỳ vòng lặp MCU; `hardware.json` → `stm32_io.di_update_ms` ≥ 2 × giá trị này | CONFIGURATION → mock.json |
+
+### 3a. Phân bổ bit khi phần cứng chưa đi dây
+
+1. Liệt kê mọi nguồn/tín hiệu cần đưa vào khối và mọi mức mỗi chân cần nhận (tra `actions` của mọi bài).
+2. Mức cố định (nguồn, ±3 V, 27 V, đất, xung…) lấy từ nguồn ngoài qua rơ-le; DAC chỉ cho mức nhỏ thay đổi theo bài.
+3. **Tránh các bit firmware tự bật khi `Mode ≠ 1`/reset** (`hmi_forced_bits`, xem STM32_MODBUS_PC mục 9.5). Với bo matrix, quy đổi các bit đó ra (đầu vào, đầu ra) và để trống đầu vào tương ứng, để MCU reset không đưa nguồn ra chân.
+4. Đặt `interlocks` cho các nguồn không được bật cùng lúc; bước đổi nguồn sẽ được ngắt trước đóng sau (`break_ms`).
+5. Bo/thanh ghi mà firmware CPU chưa chuyển tiếp: khai báo `extra_write_registers` và ghi "cần sửa FW" trong `unresolved`; muốn khóa thì đặt bo đó `unsupported`.
+6. Ghi bảng phân bổ vào STM32_MODBUS_PC mục 9.10 (hoặc mục tương ứng của giá thử mới) để người đi dây làm theo, và ghi các điểm cần kiểm vào PROGRESS.
 
 Nguyên tắc khi điền:
-- **Dải cho phép = `nominal ± tolerance`.** Tài liệu thiếu hoặc mâu thuẫn → để `tolerance: null` và ghi vào `issues`. Bài sẽ BLOCKED; không tự điền số để bài chạy được.
+- **Dải cho phép = `nominal ± tolerance`.** Tài liệu thiếu hoặc mâu thuẫn → để `tolerance: null` và ghi vào `issues`. Bài sẽ BLOCKED; không tự điền số để bài chạy được. Giá trị do người có thẩm quyền chỉ định tạm thì điền kèm `basis` ghi rõ "tạm, ai chỉ định, ngày".
+- Số đo bằng thiết bị ngoài (oxilo…) dùng input `manual`; bỏ trống thì kết quả ghi "mặc định, chưa đo".
 - Giữ `id` tín hiệu/bài ổn định; đổi tên hiển thị thì sửa `label`/`name`.
 - Chỉ đổi `status` thành `verified` sau khi đã đo kiểm trên mạch thật.
 
@@ -55,6 +67,9 @@ conda run -n qt_env python -B -m unittest discover -s tests
 | `set_12: Trùng SW01.bit0 với set_4` | Hai lệnh dùng chung một bit |
 | `… cần hai mức khác nhau trên cùng một DAC` | Hai kích thích analog khác mức cùng lúc |
 | `… ngoài dải …` / `mã DAC … ngoài giới hạn` | Giá trị vượt `min/max` hoặc giới hạn DAC |
+| `… không có nguồn … nối tới chân này` | Mức yêu cầu không có đầu vào matrix tương ứng và chân không có DAC |
+| `… bị HMI CPU tự bật, không được dùng` | Output dùng bit trong `hmi_forced_bits` |
+| `Liên động: không được bật đồng thời …` | Vi phạm `interlocks` |
 | `Đơn vị không khớp tín hiệu` | `unit` của check khác đơn vị tín hiệu |
 | `wire_signals phải ánh xạ duy nhất toàn bộ tín hiệu` | Tín hiệu mới chưa có trong `wire_signals` |
 | `preparation/cleanup phải là ID trong target.sequences` | Sai tên trình tự |
@@ -102,7 +117,7 @@ cập nhật tài liệu liên quan và `PROGRESS.md`.
 - [ ] File đối tượng: `source_paragraphs` nguyên văn; đủ bài/bước; chỗ thiếu ghi `issues`.
 - [ ] `sequences` có `basis`.
 - [ ] `hardware.json`: mọi tín hiệu có `stm32_io` (`assumed`/`unsupported`); cập nhật `wire_signals`.
-- [ ] `mock.json`: `stm32_cases` độc lập với dải tiêu chuẩn.
+- [ ] `mock.json`: `stm32_cases` độc lập với dải tiêu chuẩn; `stm32_timing.loop_ms` khớp chu kỳ vòng lặp MCU (khi đã đo được).
 - [ ] Ứng dụng mở được với `--profile`; chạy mô phỏng tự động; đã xem lý do BLOCKED.
 - [ ] Toàn bộ test đạt.
 - [ ] Sửa nhãn Login nếu cần; cập nhật `PROGRESS.md`.
@@ -112,11 +127,13 @@ cập nhật tài liệu liên quan và `PROGRESS.md`.
 Giới hạn (2026-11-18):
 - Bộ chạy bài chỉ chạy với simulator; chưa có đường chạy mạch thật.
 - Một profile mỗi lần khởi động; chưa đổi profile khi đang chạy.
-- Tiêu chí chỉ có dạng `nominal ± tolerance`.
-- Thao tác: bật/tắt bit, một mức DAC tại một thời điểm, đo ADC qua MUX.
+- Tiêu chí chỉ có dạng `nominal ± tolerance` (có thể so trị tuyệt đối).
+- Thao tác: bật/tắt bit, chọn nguồn qua bo matrix, một mức DAC tại một thời điểm, đo ADC qua MUX, nhập tay.
+- Bo matrix chỉ hỗ trợ bố cục `out*8+in` (8 đầu vào).
 - Bản đồ thanh ghi STM32 dùng chung cho mọi profile (theo CPUv1.0).
 - `wire_signals` của giao thức cũ vẫn bắt buộc.
 
 Lịch sử:
 - 2026-11-18: bản đầu tiên.
 - 2026-11-18: chuẩn hóa tài liệu; chỉ giữ quy trình, phần schema chuyển về CONFIGURATION.md.
+- 2026-11-18: thêm mục 3a (phân bổ bit, bo matrix, tránh bit HMI, liên động), nhập tay, giá trị tạm có `basis`.

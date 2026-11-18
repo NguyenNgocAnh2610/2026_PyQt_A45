@@ -14,7 +14,8 @@ from PySide6.QtSerialBus import QModbusDevice, QModbusRtuSerialClient, QModbusDa
 from src.common.testing import TRANSACTION_TIMEOUT_MS
 from src.common.serial import SerialSettings
 from src.protocol import (make_read_unit, WireCodec, encode_frame, decode_frame, FrameStream,
-                          frame_to_registers, registers_to_frame, register_words, validate_write_ack)
+                          frame_to_registers, registers_to_frame, register_words, validate_write_ack,
+                          rtu_adu, rtu_request_pdu)
 from src.simulator import SimulatedController
 from src.common.wire import (MAX_FRAME, REQUEST_MAILBOX, RESPONSE_MAILBOX, COMMIT_REGISTER,
                              MODBUS_WRITE_CHUNK, MODBUS_READ_CHUNK)
@@ -26,6 +27,9 @@ class SerialConnection(QObject):
     write_finished = Signal(object, str)
     received = Signal(bytes)
     wire_finished = Signal(object, str)
+    # ('TX'|'RX', RTU frame). Rebuilt from the PDU + CRC: QModbusRtuSerialClient
+    # does not expose raw bytes, so the real and the virtual port log alike.
+    frame_logged = Signal(str, bytes)
 
     def __init__(self, parent=None, rtu_factory=QModbusRtuSerialClient,
                  uart_factory=QSerialPort):
@@ -268,6 +272,7 @@ class SerialConnection(QObject):
             reply.deleteLater()
             return
         self.reply = reply
+        self.frame_logged.emit('TX', rtu_adu(slave, rtu_request_pdu(function, address, count=count)))
         reply.finished.connect(lambda: self._read_done(client, reply))
         # A bounded guard also covers a stalled/misbehaving client. Close on this
         # guard so a late RTU response cannot be consumed by a new transaction.
@@ -289,7 +294,9 @@ class SerialConnection(QObject):
             if error == QModbusDevice.TimeoutError:
                 message = 'Timeout: không có phản hồi Modbus hợp lệ; không tự gửi lại.'
             elif error == QModbusDevice.ProtocolError:
-                message = f'Lỗi Modbus exception {reply.rawResult().exceptionCode().value}: {message}'
+                code = reply.rawResult().exceptionCode().value
+                self._log_exception(request['slave'], request['function'], code)
+                message = f'Lỗi Modbus exception {code}: {message}'
         else:
             unit = reply.result()
             expected = make_read_unit(**request)
@@ -299,7 +306,10 @@ class SerialConnection(QObject):
                     or unit.valueCount() != request['count']):
                 message = 'Phản hồi không khớp slave/loại/địa chỉ/số thanh ghi yêu cầu.'
             else:
-                result = dict(request, values=list(unit.values()), timestamp=time.monotonic())
+                values = list(unit.values())
+                self.frame_logged.emit('RX', rtu_adu(request['slave'], bytes([request['function'], 2 * len(values)])
+                                                     + b''.join(v.to_bytes(2, 'big') for v in values)))
+                result = dict(request, values=values, timestamp=time.monotonic())
         reply.deleteLater()
         if error in (QModbusDevice.TimeoutError, QModbusDevice.InvalidResponseError):
             # RTU has no transaction ID. Require a fresh connection after an
@@ -331,6 +341,7 @@ class SerialConnection(QObject):
             self.write_finished.emit(None, client.errorString() or 'Không gửi được yêu cầu ghi.')
             return
         self.reply = reply
+        self.frame_logged.emit('TX', rtu_adu(slave, rtu_request_pdu(self._request['function'], address, values)))
         reply.finished.connect(lambda: self._write_done(client, reply))
         self.deadline.start(self.settings.timeout_ms + 1000)
         if reply.isFinished():
@@ -344,7 +355,9 @@ class SerialConnection(QObject):
         if error != QModbusDevice.NoError:
             message = reply.errorString() or 'Lỗi ghi Modbus.'
             if error == QModbusDevice.ProtocolError:
-                message = f'Modbus exception {reply.rawResult().exceptionCode().value}: {message}'
+                code = reply.rawResult().exceptionCode().value
+                self._log_exception(request['slave'], request['function'], code)
+                message = f'Modbus exception {code}: {message}'
             else:
                 self._fail(message + ' Chưa biết lệnh đã thực thi hay chưa; không tự gửi lại.')
                 return
@@ -354,11 +367,17 @@ class SerialConnection(QObject):
             return
         else:
             message = ''
+            raw = reply.rawResult()
+            self.frame_logged.emit('RX', rtu_adu(request['slave'], bytes([request['function']]) + bytes(raw.data())))
         self.deadline.stop()
         self.reply = None
         self._request = None
         reply.deleteLater()
         self.write_finished.emit(None if message else dict(request, timestamp=time.monotonic()), message)
+
+    def _log_exception(self, slave, function, code):
+        if isinstance(code, int) and 0 <= code <= 255:
+            self.frame_logged.emit('RX', rtu_adu(slave, bytes([function | 0x80, code])))
 
     def _deadline_expired(self):
         self._fail('Timeout mở cổng/giao dịch. Đã đóng COM; hãy kết nối lại.')

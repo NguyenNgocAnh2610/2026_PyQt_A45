@@ -91,6 +91,8 @@ Quy ước chung:
 | `independence` | `mock_only` / `verified` / `unknown` (`unknown` + có bài FAIL trước → BLOCKED) |
 | `preparation`, `cleanup` | Adapter `stm32`: ID trong `sequences`. Adapter `mock`: `mock_baseline` / `mock_safe` |
 | `issues` | Điểm chưa chốt; có issue ở bài hoặc bước → **BLOCKED**, không gửi lệnh |
+| `stop_on_fail` | Tùy chọn (`true`/`false`). Bài FAIL thì về an toàn rồi **dừng cả lượt** (dùng cho bài nguồn P01/P02) |
+| `notes` | Tùy chọn. Ghi chú tự do (ví dụ điểm còn nghi vấn nhưng người dùng giữ đúng tài liệu) |
 | `steps` | Danh sách bước |
 
 ### Bước (`steps[]`)
@@ -105,15 +107,18 @@ Quy ước chung:
 
 | Trường | Ý nghĩa |
 |---|---|
-| `capability` | Phải có trong `hardware.capabilities` (hiện: `stimulate_measure`, `diagnose`) |
-| `actions` | Lệnh `{signal, value}`; cộng dồn qua các bước trong cùng bài |
+| `capability` | Phải có trong `hardware.capabilities` (hiện: `stimulate_measure`, `stimulate`, `diagnose`) |
+| `actions` | Lệnh `{signal, value}`; cộng dồn qua các bước trong cùng bài. `value: null` = nhả tiếp điểm/hở chân; output nguồn có `off_value` thì `value: 0` cũng là nhả |
 | `wait_ms` | Thời gian chờ ổn định trước khi đo; `timing_basis` ghi nguồn gốc (tiêu chuẩn hay demo) |
-| `checks` | Phép đo `{signal, nominal, tolerance, unit}`; không được trống |
+| `checks` | Phép đo `{signal, nominal, tolerance, unit, absolute?, basis?}`. Chỉ bước `capability: "stimulate"` (giữ/chuyển trạng thái, ví dụ giữ 36 V đủ 2 phút) được để trống |
 
 Quy tắc đánh giá (`evaluate()` trong `src/backend.py`):
 - Đạt khi số đo nằm trong khoảng đóng `[nominal − tolerance, nominal + tolerance]`.
+- `absolute: true`: so `|số đo|` (chấp nhận cả hai dấu, ví dụ P20).
 - `nominal` hoặc `tolerance` = `null` → "Chưa đánh giá", không bao giờ PASS.
 - Mẫu thiếu, lỗi hoặc hết hạn → ERROR. Mẫu phải mới hơn thời điểm hết chờ ổn định.
+- Giá trị nhập tay bị bỏ trống (input `manual`): ghi `nominal` với chất lượng `default`, vẫn đánh giá nhưng lý do ghi "mặc định, chưa đo"; phiên có `defaults_used: true`.
+- `basis` (tùy chọn): nguồn gốc dung sai/dấu, bắt buộc ghi khi giá trị do người dùng chỉ định tạm.
 - Hiện chỉ hỗ trợ dải đối xứng; dải lệch hay so sánh hai tín hiệu cần sửa mã.
 
 Hệ số ×1/×10/×60 (Cài đặt) chỉ rút ngắn thời gian chờ trong mô phỏng và được lưu
@@ -135,20 +140,30 @@ vào phiên; không đổi timeout giao dịch.
 
 ```json
 "stm32_io": {
-  "slave": 9, "mux_register": "MUX", "mux_settle_ms": 20,
+  "slave": 9, "mux_register": "MUX", "mux_settle_ms": 20, "di_update_ms": 150, "break_ms": 150,
+  "mux_layout": {"banks": 2, "bank_bits": 8, "idle_channel": 31},
+  "extra_write_registers": {"SW03": 29, "SW04": 30},
   "session":    {"Mode": 1, "Plan": 2},
-  "safe_state": {"DAC_val": 0, "DOUT": 0, "SW01": 0, "SW02": 0, "MUX": 0, "Power": 0},
+  "safe_state": {"DAC_val": 0, "DOUT": 0, "SW01": 0, "SW02": 0, "MUX": 7967, "Power": 0, "SW03": 0, "SW04": 0},
+  "hmi_forced_bits": {"Power": [7, 8, 9], "SW01": [12, 14], "SW02": [0, 12]},
+  "interlocks": [["ac_36v", "ac_22v"]],
+  "dac": {"register": "DAC_val", "scale": -0.00155, "offset": 0, "min": -1.5, "max": 1.5,
+          "count_min": -1000, "count_max": 1000, "status": "assumed"},
+  "sources": {"P3V": {"value": 3}, "GND": {"value": 0}, "DAC": {"dac": true}, "PULSE": {"value": 4.5}},
+  "matrix_boards": [
+    {"id": 1, "registers": ["SW01", "SW02"], "size": {"inputs": 8, "outputs": 4}, "layout": "out*8+in",
+     "status": "assumed", "inputs": {"2": "P3V", "4": "DAC", "6": "GND"}, "outputs": {"1": "set_40"}}
+  ],
   "outputs": {
-    "dc_27v": {"kind": "bit", "register": "Power", "bit": 1, "on_value": 1, "status": "assumed"},
-    "set_40": {"kind": "analog", "register": "DAC_val", "route": [{"register": "SW02", "bit": 3}],
-               "scale": -0.005, "offset": 0, "min": -3.5, "max": 3.5,
-               "count_min": -1083, "count_max": 1045, "status": "assumed"},
-    "set_43": {"status": "unsupported", "reason": "…"}
+    "ac_36v": {"kind": "bit", "register": "Power", "bit": 0, "on_value": 1, "off_value": 0, "status": "assumed"},
+    "set_4":  {"kind": "bit", "register": "DOUT", "bit": 0, "on_value": 27, "status": "assumed"}
   },
   "inputs": {
-    "xp1_50": {"kind": "adc", "register": "ADC3_val", "signed": true, "scale": 0.01, "offset": 0,
-               "mux": 14, "status": "assumed"},
-    "ready":  {"kind": "link", "status": "assumed"}
+    "xp1_50":    {"kind": "adc", "register": "ADC3_val", "signed": true, "scale": 0.01, "offset": 0,
+                  "mux": 8, "mux_bank": 0, "status": "assumed"},
+    "hz_A":      {"kind": "manual", "prompt": "Tần số pha A đo trên oxilo", "status": "assumed"},
+    "diag_loop": {"kind": "loop_probe", "duration_ms": 2000, "poll_ms": 10, "status": "assumed"},
+    "ready":     {"kind": "link", "status": "assumed"}
   }
 }
 ```
@@ -157,50 +172,68 @@ vào phiên; không đổi timeout giao dịch.
 |---|---|
 | `slave` | 1–247 |
 | `session` | Ghi đầu mỗi bài; bắt buộc `"Mode": 1` |
-| `safe_state` | Giá trị an toàn cho **mọi** thanh ghi mà output dùng (gồm MUX) |
-| `mux_register`, `mux_settle_ms` | Thanh ghi chọn kênh đo; thời gian chờ sau khi đổi kênh |
-| Tên thanh ghi | Theo `WriteRegister`/`ReadRegister` (`src/common/stm32.py`). Chỉ được ghi `BENCH_WRITABLE`, không DataO1/DataO2/DataO3/CDT/DataT/Null |
-| Output `bit` | Đặt bit khi action đúng `on_value` (mức tiếp điểm cấp: 1, 27, 5, 0 V…); tắt bằng `safe_state`. Không hai output chung một bit |
-| Output `analog` | Mã DAC = round((giá trị − offset) / scale), bật các bit `route`. Ngoài `min/max` hoặc `count_min/count_max` → lỗi, không kẹp giá trị. Hai mức khác nhau cùng lúc trên một DAC → lỗi |
-| Input `adc` | Giá trị = (int16 nếu `signed`) × `scale` + `offset`; `mux` = mã ghi vào `mux_register` trước khi đọc (`null` nếu không cần). Cặp (`mux`, thanh ghi) không trùng |
+| `safe_state` | Giá trị an toàn cho **mọi** thanh ghi mà output dùng. `MUX` phải bằng word "mọi bank ở `idle_channel`" |
+| `mux_register`, `mux_settle_ms` | Thanh ghi chọn kênh đo; thời gian ổn định analog sau khi đổi kênh |
+| `mux_layout` | Tùy chọn, mặc định 1 bank 16 bit, idle 0. Word MUX = OR các bank, mỗi bank `bank_bits` bit chứa **số kênh**; bank không đo giữ `idle_channel` (kênh hở hết) |
+| `di_update_ms` | Tùy chọn, mặc định 0. Thời gian để lệnh đã ACK lên tới DI: vòng lặp MCU chuyển lệnh xuống bo con, đọc ADC, chép DI. Số đo chỉ được đọc khi đã qua `di_update_ms + mux_settle_ms` kể từ ACK ghi cuối. Đặt ≥ 2 × chu kỳ vòng lặp MCU đo được (bài tự kiểm tra D02) |
+| `break_ms` | Tùy chọn, mặc định = `di_update_ms`. Ngắt trước đóng sau: khi một bước vừa nhả vừa đóng rơ-le, ghi phần nhả, chờ `break_ms` kể từ ACK, rồi mới ghi phần đóng |
+| `extra_write_registers` | Tùy chọn. Thanh ghi DO **đề xuất sửa firmware** (tên mới, index 29–31). Chỉ bộ chạy bài và COM ảo dùng; ghi rõ "cần sửa FW" trong `unresolved` |
+| Tên thanh ghi | Theo `WriteRegister`/`ReadRegister` (`src/common/stm32.py`) hoặc `extra_write_registers`. Chỉ được ghi `BENCH_WRITABLE` + thanh ghi mở rộng, không DataO1/DataO2/DataO3/CDT/DataT/Null |
+| `hmi_forced_bits` | Bit firmware tự bật khi `Mode ≠ 1`/reset; validator cấm mọi output dùng các bit này |
+| `interlocks` | Tùy chọn. Nhóm output không được bật cùng lúc; ảnh DO vi phạm → lỗi khi nạp/khi chạy |
+| `dac` | Tùy chọn. Mã = round((giá trị − offset) / scale) vào `DAC_val`. Ngoài `min/max` hoặc `count_min/count_max` → lỗi, không kẹp. Hai chân cần hai mức khác nhau cùng lúc → lỗi |
+| `sources` | Nguồn có sẵn đưa vào đầu vào bo matrix: `{value}` (mức cố định, đất = 0) hoặc `{dac: true}` |
+| `matrix_boards[]` | Bo matrix rơ-le: `id`, `registers` (đủ `inputs × outputs` bit), `size`, `layout` (hiện chỉ `out*8+in`), `status`, `inputs {số: nguồn}`, `outputs {số: tín hiệu}`. Mỗi đầu ra sinh một output kiểu `pin`. Bo `unsupported` (+ `reason`) làm mọi bài dùng chân của nó BLOCKED |
+| Output `pin` | Sinh từ `matrix_boards`. Action nhả mọi điểm giao của chân rồi đóng **một** đầu vào có `value` bằng giá trị yêu cầu, hoặc đầu vào DAC nếu không có mức sẵn; `null` = hở mạch. Không có nguồn phù hợp → lỗi |
+| Output `bit` | Đặt bit khi action đúng `on_value` (mức tiếp điểm cấp: 1, 27, 5, 0 V…); nhả bằng `off_value` (tùy chọn), `null` hoặc `safe_state`. Không hai output chung một bit |
+| Input `adc` | Giá trị = (int16 nếu `signed`) × `scale` + `offset`; `mux` = **số kênh** trong bank `mux_bank` (khác `idle_channel`; `null` nếu không cần). Bộ (`mux`, `mux_bank`, thanh ghi) không trùng |
 | Input `link` | = 1 khi FC03 hợp lệ |
+| Input `manual` | Người vận hành nhập (`prompt`); không đọc qua FC03 |
+| Input `loop_probe` | Tự kiểm tra chu kỳ vòng lặp CPU: đọc FC03 mỗi `poll_ms` trong `duration_ms` |
 | `status` | `assumed` (chưa đo kiểm) / `verified` (**chỉ sau khi đo kiểm thật**) / `unsupported` + `reason` (bài dùng tín hiệu này → BLOCKED) |
 | `note`, `*_note` | Ghi chú tự do |
 
 Mọi tín hiệu dùng trong `actions`, `checks` và `sequences` phải có mục trong
 `stm32_io`. Khi nạp, validator chạy thử chuỗi safe_state → chuẩn bị → từng bước
-của mọi bài để bắt bit trùng, xung đột DAC hoặc giá trị ngoài dải.
+của mọi bài để bắt bit trùng, bit HMI, xung đột DAC, vi phạm liên động hoặc giá trị
+không có nguồn.
 
 ## mock.json
 
 | Khóa | Adapter | Nội dung |
 |---|---|---|
 | `stm32_cases` | `stm32` | `[{when: {tín hiệu yêu cầu: giá trị}, after_ms?, measure: {tín hiệu đo: giá trị}}]` |
+| `stm32_timing` | `stm32` | Tùy chọn. `{loop_ms, note}`: chu kỳ vòng lặp chính MCU mà COM ảo mô phỏng (0 = áp dụng tức thì). Lấy theo số đo trên mạch thật |
 | `cases` | `mock` | `{"<test_id>/<step_id>": {tín hiệu đo: giá trị}}` cho mọi bước |
 
 Với `stm32_cases`, simulator chọn case khớp nhiều điều kiện `when` nhất (và đã đủ
 `after_ms` thời gian mô phỏng kể từ khi kích thích bật) cho kênh MUX đang đọc;
-không khớp thì trả 0. Số liệu là **demo**: không chép dải tiêu chuẩn để tạo PASS.
+không khớp thì trả 0. Mức DAC khớp trong phạm vi nửa bước DAC. Số liệu là **demo**:
+không chép dải tiêu chuẩn để tạo PASS.
 
 ## Hiện trạng profile A45 / khối 1101K-10
 
-Tài liệu nguồn: [BAI_KIEM_TRA_1101K.md](BAI_KIEM_TRA_1101K.md). Điểm chưa đủ đặc tả (giữ `issues`):
+Tài liệu nguồn: [BAI_KIEM_TRA_1101K.md](BAI_KIEM_TRA_1101K.md). Các điểm chưa đủ đặc tả
+đã được người dùng chốt tạm ngày 2026-11-18 (phiếu xác nhận); giá trị tạm ghi ở `basis`
+của từng check, điểm còn nghi vấn ở `notes` của bài. Không còn `issues`.
 
-| Bài | Cần xác minh |
+| Bài | Đã chốt (tạm) |
 |---|---|
-| P01 | Chuyển/đáp ứng 36 V → 22 V; thiếu dung sai điện áp; ý nghĩa kiểm tra từng pha |
-| P12 | Dung sai nhánh +8,5 V |
-| P16 | Đầu ra 26XP1 được ghi cho kênh II |
-| P17 | Dung sai nhánh +9 V |
-| P20–P24 | Điều kiện kích thích ứng với từng cực tính `±` |
-| P21 | Điều kiện ±3 V tại 54XP1 |
-| P23–P24 | Có/không CX3 nhưng cùng ghi 5 V tại 13XP1 |
+| P01 | Rơ-le 1 (36 V) → đo dòng sau 1 s → giữ đủ 2 phút → ngắt rơ-le 1, đóng rơ-le 2 (22 V). Áp 22 ± 2 V; tần số nhập tay; `stop_on_fail` |
+| P02 | Mỗi cực DC một rơ-le; `stop_on_fail` |
+| P10–P12 | Xung 10 kHz từ bo tạo xung có sẵn qua rơ-le |
+| P12, P17 | Dung sai nhánh còn thiếu = ±0,2 V |
+| P16, P18, P23 | Giữ đúng tài liệu (26XP1; −0,3 V; cấp 5 V vào 13XP1), còn nghi vấn |
+| P20 | Kiểm trị tuyệt đối U(50XP1) = 8,5 ± 0,2 V (`absolute`) |
+| P21 | Hai bước ±3 V tại 54XP1 → 49XP1 = ±8,5 V |
+| P22–P24 | Dấu tạm: 50XP1 dương, 49XP1 âm |
 
-Thêm vào đó, P10/P11/P12 dùng xung 10 kHz và P01 dùng đo tần số, là hai việc
-CPUv1.0 không làm được (`unsupported`). Chạy tự động mô phỏng: **13 PASS,
-11 BLOCKED → "Chưa đầy đủ"**. PASS mô phỏng không có nghĩa bài sẵn sàng chạy phần
-cứng: ánh xạ `stm32_io` và các trình tự `sequences` vẫn là giả định. Tự kiểm tra:
-D01 chỉ kiểm tra FC03; D02/D03 BLOCKED.
+Chạy tự động mô phỏng: **24/24 PASS** (bỏ trống tần số thì ghi "có giá trị mặc định
+chưa đo"). PASS mô phỏng không có nghĩa bài sẵn sàng chạy phần cứng: ánh xạ
+`stm32_io` (bảng phân bổ để đi dây, `docs/STM32_MODBUS_PC.md` mục 9.10) và trình tự
+`sequences` vẫn là giả định; bo matrix 2 cần sửa firmware CPU. Tự kiểm tra: D01
+truyền thông (ghi có ACK + FC03), D02 chu kỳ vòng lặp CPU, D03 chưa định nghĩa
+(BLOCKED).
 
 Cấu hình thứ hai `alternative_profile` (`tests/test_bench.py`, trạm nhiệt demo,
 adapter `mock`) kiểm tra rằng UI và bộ chạy bài không phụ thuộc tên A45.

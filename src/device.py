@@ -1,5 +1,6 @@
 """Semantic bench operations; no UI state or verdicts."""
 from collections import deque
+import math
 import secrets
 import time
 from PySide6.QtCore import QObject, Signal, QTimer
@@ -7,8 +8,11 @@ from PySide6.QtCore import QObject, Signal, QTimer
 from src.communication import Communication, SerialConnection
 from src.protocol import decode_snapshot, WireCodec, encode_frame
 from src.protocol import stm32_write_words, make_read_unit, register_words, Stm32IoMap
+from src.common.serial import SerialSettings
 from src.common.stm32 import DEFAULT_SLAVE, READ_COUNT
-from src.simulator import Stm32Simulator
+from src.common.testing import TRANSACTION_TIMEOUT_MS
+from src.simulator import Stm32Simulator, Stm32RtuSlave
+from src.virtual_port import VirtualLine, VIRTUAL_PORT, create_virtual_connection
 
 
 class Device(QObject):
@@ -25,7 +29,18 @@ class Device(QObject):
         self.serial_connection = SerialConnection(self)
         hardware = profile.hardware
         self.io_map = Stm32IoMap(hardware['stm32_io']) if hardware.get('adapter') == 'stm32' else None
-        self.stm32_simulator = Stm32Simulator(io_map=self.io_map, cases=profile.fixtures.get('stm32_cases', ()))
+        timing = profile.fixtures.get('stm32_timing', {})
+        self.stm32_simulator = Stm32Simulator(io_map=self.io_map, cases=profile.fixtures.get('stm32_cases', ()),
+                                              loop_ms=timing.get('loop_ms', 0))
+        # Simulation = a virtual COM port: real RTU frames to the simulated
+        # slave through the same SerialConnection as the physical port.
+        self.virtual_line = VirtualLine(Stm32RtuSlave(self.stm32_simulator))
+        self.virtual_connection = create_virtual_connection(self, self.virtual_line)
+        serial = hardware.get('serial', {})
+        self.virtual_settings = SerialSettings(
+            'rtu', VIRTUAL_PORT, serial.get('baudrate') or 115200, parity=serial.get('parity') or 'N',
+            stop_bits=serial.get('stop_bits') or 1, timeout_ms=TRANSACTION_TIMEOUT_MS)
+        self._last_write_ack = None
         # DO words the MCU has ACKed for the runner. A missing address means
         # unknown (never written, or a write failed/was cancelled).
         self.bench_image = {}
@@ -34,11 +49,12 @@ class Device(QObject):
         self._bench_timer.setSingleShot(True)
         self._bench_timer.timeout.connect(self._bench_step)
         self._stm32_request = None
-        self._stm32_timer = QTimer(self)
-        self._stm32_timer.setSingleShot(True)
-        self._stm32_timer.timeout.connect(self._stm32_simulate)
-        self.serial_connection.read_finished.connect(lambda result, error: self._stm32_received('read', result, error))
-        self.serial_connection.write_finished.connect(lambda result, error: self._stm32_received('write', result, error))
+        for link, simulation in ((self.serial_connection, False), (self.virtual_connection, True)):
+            link.read_finished.connect(
+                lambda result, error, sim=simulation: self._stm32_received('read', result, error, sim))
+            link.write_finished.connect(
+                lambda result, error, sim=simulation: self._stm32_received('write', result, error, sim))
+        self.virtual_connection.status_changed.connect(self._virtual_link_changed)
         self.physical_codec = WireCodec(profile)
         self._controller_request = None
         self._controller_sequence = 0
@@ -68,11 +84,27 @@ class Device(QObject):
         self.serial_connection.read_registers(slave, function, address, count)
 
     def close_serial(self):
-        self.cancel_stm32()
+        if self._stm32_request is not None and not self._stm32_request['simulation']:
+            self.cancel_stm32()
         self.serial_connection.close()
 
+    def open_virtual(self):
+        """Open the virtual COM port (synchronous); no frame is sent."""
+        if self.virtual_connection.state != 'open':
+            self.virtual_connection.open(self.virtual_settings)
+        if self.virtual_connection.state != 'open':
+            raise ValueError('Không mở được cổng COM ảo.')
+
+    def close_virtual(self):
+        if self._stm32_request is not None and self._stm32_request['simulation']:
+            self.cancel_stm32()
+        self.virtual_connection.close()
+
+    def _virtual_link_changed(self, state, detail):
+        if state != 'open' and self._stm32_request is not None and self._stm32_request['simulation']:
+            self.cancel_stm32(detail or 'COM ảo đã đóng; kết quả lệnh đang chờ chưa biết, không tự gửi lại.')
+
     def cancel_stm32(self, reason='Giao dịch đã hủy; kết quả lệnh đang chờ chưa biết, không tự gửi lại.'):
-        self._stm32_timer.stop()
         pending, self._stm32_request = self._stm32_request, None
         if pending is None:
             return
@@ -94,47 +126,26 @@ class Device(QObject):
         self._request_stm32('write', slave, simulation, int(address), words)
 
     def _request_stm32(self, operation, slave, simulation, address=1, values=None, owner='diag'):
+        """One Modbus transaction on the real or the virtual COM port; the
+        code path after this point is identical for both."""
         make_read_unit(slave, 3, 1, READ_COUNT - 1)
         if self._stm32_request is not None:
             raise ValueError('Đang chờ giao dịch STM32.')
+        link = self.virtual_connection if simulation else self.serial_connection
+        if simulation:
+            self.open_virtual()
+            self.virtual_line.scenario = self.communication.transport.scenario
+            self.virtual_line.stage = self._bench['operation'] if owner == 'bench' and self._bench else None
         self._stm32_request = dict(operation=operation, slave=slave, simulation=simulation,
                                    address=address, values=values, owner=owner)
         try:
-            if simulation:
-                delay = 30
-                if owner == 'bench':
-                    scenario = self.communication.transport.scenario
-                    stage = self._bench['operation'] if self._bench else ''
-                    if (scenario, stage) in (('timeout', 'apply'), ('stop_timeout', 'finish')):
-                        return  # Simulated silence: the runner deadline decides, no retry.
-                    delay = 350 if scenario == 'slow' else 30
-                self._stm32_timer.start(delay)
-            elif operation == 'read':
-                self.serial_connection.read_registers(slave, 3, 1, READ_COUNT - 1)
+            if operation == 'read':
+                link.read_registers(slave, 3, 1, READ_COUNT - 1)
             else:
-                self.serial_connection.write_registers(slave, address, values)
+                link.write_registers(slave, address, values)
         except ValueError:
             self._stm32_request = None
             raise
-
-    def _stm32_simulate(self):
-        pending = self._stm32_request
-        if pending is None:
-            return
-        result, error = None, ''
-        try:
-            if (pending['owner'] == 'bench' and self.communication.transport.scenario == 'disconnect'
-                    and self._bench and self._bench['operation'] == 'measure'):
-                raise ValueError('Mất liên lạc với STM32 khi đang đo (mô phỏng).')
-            if pending['operation'] == 'read':
-                result = dict(slave=pending['slave'], address=1, function=3,
-                              values=self.stm32_simulator.read(pending['slave']), timestamp=time.monotonic())
-            else:
-                self.stm32_simulator.write(pending['slave'], pending['address'], pending['values'])
-                result = dict(pending, timestamp=time.monotonic())
-        except ValueError as exc:
-            error = str(exc)
-        self._stm32_received(pending['operation'], result, error, simulation=True)
 
     def _stm32_received(self, operation, result, error, simulation=False):
         pending = self._stm32_request
@@ -180,12 +191,19 @@ class Device(QObject):
         return self._bench_begin('apply', token, [('image', target, False)], simulation)
 
     def bench_measure(self, token, signals, simulation=True):
+        """FC03 per MUX group; ``loop_probe`` inputs poll FC03 for a while.
+        ``manual`` inputs are entered by the operator, never read here."""
         io = self._require_io()
         ops = []
-        for mux, group in io.groups(signals):
+        probes = [s for s in signals if io.input_kind(s) == 'loop_probe']
+        readable = [s for s in signals if s not in probes and io.input_kind(s) != 'manual']
+        for mux, group in io.groups(readable):
             if mux is not None:
-                ops += [('mux', mux), ('wait', io.mux_settle_ms)]
-            ops.append(('read', group))
+                ops.append(('mux', mux))
+            # DI shows new outputs only after the MCU loop ran them (di_update_ms)
+            # plus the analog settle, counted from the last write ACK.
+            ops += [('after_ack', io.di_update_ms + io.mux_settle_ms), ('read', group)]
+        ops += [('probe', sid) for sid in probes]
         return self._bench_begin('measure', token, ops, simulation)
 
     def bench_finish(self, token, actions, simulation=True):
@@ -202,8 +220,7 @@ class Device(QObject):
         self._bench_timer.stop()
         self.bench_image = {}
         if self._stm32_request is not None and self._stm32_request['owner'] == 'bench':
-            self._stm32_timer.stop()
-            self._stm32_request = None  # A late real reply is ignored.
+            self._stm32_request = None  # A late reply is ignored.
 
     def _bench_begin(self, operation, token, ops, simulation, replace=False):
         if self._bench is not None and not replace:
@@ -228,13 +245,33 @@ class Device(QObject):
             if op[0] == 'wait':
                 self._bench_timer.start(int(op[1]))
                 return
+            if op[0] == 'after_ack':
+                # Wait until op[1] ms have passed since the last write ACK.
+                due = (self._last_write_ack or 0) + op[1] / 1000
+                remaining = due - time.monotonic()
+                if remaining > 0:
+                    self._bench_timer.start(math.ceil(remaining * 1000))
+                    return
+                continue
             if op[0] == 'mux':
                 target = dict(self.bench_image)
                 target[io.mux] = op[1]
                 op = ('image', target, False)
             if op[0] == 'image':
-                runs = Stm32IoMap.writes(None if op[2] else self.bench_image, op[1])
-                seq['ops'].extendleft(reversed([('write', address, words) for address, words in runs]))
+                # Break-before-make: open relays, wait until the MCU loop has
+                # executed that write, then close the new ones.
+                previous = None if op[2] else self.bench_image
+                expanded = []
+                for index, image in enumerate(io.phases(previous, op[1])):
+                    if index:
+                        expanded.append(('after_ack', io.break_ms))
+                    expanded += [('write', address, words) for address, words in io.writes(previous, image)]
+                    previous = image
+                seq['ops'].extendleft(reversed(expanded))
+                continue
+            if op[0] == 'probe':
+                if not self._probe_step(seq, op):
+                    return
                 continue
             try:
                 if op[0] == 'write':
@@ -249,6 +286,32 @@ class Device(QObject):
         self.bench_completed.emit(seq['operation'], seq['token'], dict(
             values=seq['values'], timestamp=seq['timestamp'], writes=seq['writes'], reads=seq['reads'],
             simulation=seq['simulation']), '')
+
+    def _probe_step(self, seq, op):
+        """Self-test D02: poll FC03 for ``duration_ms``; the CPU loop period is
+        the mean interval between reads in which ADC0–4 changed. Returns True
+        when the estimate is done, False while a read is outstanding/failed."""
+        sid = op[1]
+        entry = self.io_map.inputs[sid]
+        probe = seq.setdefault('probe', dict(end=time.monotonic() + entry['duration_ms'] / 1000,
+                                             poll_ms=entry['poll_ms'], last=None, changes=[]))
+        if time.monotonic() < probe['end']:
+            seq['ops'].appendleft(op)
+            seq['pending_probe'] = True
+            try:
+                self._request_stm32('read', self.io_map.slave, seq['simulation'], owner='bench')
+            except ValueError as error:
+                self._bench_fail(str(error))
+            return False
+        seq.pop('probe')
+        changes = probe['changes']
+        if len(changes) < 3:
+            self._bench_fail('Tự kiểm tra chu kỳ CPU: ADC0–4 không đổi đủ số lần trong thời gian đo, '
+                             'không ước lượng được chu kỳ vòng lặp.')
+            return False
+        seq['values'][sid] = round((changes[-1] - changes[0]) / (len(changes) - 1) * 1000, 1)
+        seq['timestamp'] = time.monotonic()
+        return True
 
     def _forget_write(self, pending):
         if pending['operation'] == 'write':
@@ -268,6 +331,7 @@ class Device(QObject):
             self._bench_fail(error)
             return
         if pending['operation'] == 'write':
+            self._last_write_ack = time.monotonic()
             for offset, word in enumerate(pending['values']):
                 self.bench_image[pending['address'] + offset] = word
             if seq is not None:
@@ -277,6 +341,15 @@ class Device(QObject):
                 words = [0] + register_words(result['values'])
                 if result['address'] != 1 or len(words) != READ_COUNT:
                     raise ValueError('Phản hồi không đủ mảng Modbus_DI 1–29.')
+                if seq is not None and seq.pop('pending_probe', False):
+                    probe = seq['probe']
+                    adc = tuple(words[7:12])  # ADC0_val … ADC4_val
+                    if probe['last'] is not None and adc != probe['last']:
+                        probe['changes'].append(result['timestamp'])
+                    probe['last'] = adc
+                    seq['reads'] += 1
+                    self._bench_timer.start(probe['poll_ms'])
+                    return
                 if seq is not None:
                     for sid in seq.pop('pending_read', []):
                         seq['values'][sid] = self.io_map.decode(words, sid)

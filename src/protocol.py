@@ -56,10 +56,12 @@ def encode_encoder(period_ms, pulses, forward=True):
     return [0x8000 | (0x4000 if forward else 0) | period_ms, pulses]
 
 
-def stm32_write_words(address, values):
+def stm32_write_words(address, values, limit=WRITE_COUNT):
+    """``limit`` > WRITE_COUNT only for registers a profile declares as a
+    proposed CPU firmware extension (``stm32_io.extra_write_registers``)."""
     words = register_words(values)
-    if not isinstance(address, int) or isinstance(address, bool) or address < 1 or not words or address + len(words) > WRITE_COUNT:
-        raise ValueError('Vùng ghi STM32 chỉ có địa chỉ 1–28; địa chỉ 0 dành riêng.')
+    if not isinstance(address, int) or isinstance(address, bool) or address < 1 or not words or address + len(words) > limit:
+        raise ValueError(f'Vùng ghi STM32 chỉ có địa chỉ 1–{limit - 1}; địa chỉ 0 dành riêng.')
     return words
 
 
@@ -94,16 +96,77 @@ class Stm32IoMap:
     An *image* is ``{DO address: uint16}`` for the registers the runner owns.
     Defaults in ``hardware.stm32_io`` follow CPUv1.0 and stay ``assumed`` until
     verified on the bench; this class never decides that an output is safe.
+
+    Output kinds:
+    - ``bit``: one relay/DOUT bit that switches a fixed source (``on_value``);
+      ``off_value`` (optional) or ``None`` opens it.
+    - ``pin``: one bench pin wired to a signal-relay matrix board. Each matrix
+      input carries a ready-made source (fixed level, ground, DAC, pulse). The
+      pin is connected to at most one input at a time; ``None`` leaves it open.
     """
 
     def __init__(self, io):
         self.slave = io['slave']
-        self.mux = int(WriteRegister[io['mux_register']])
+        self.extra = {name: int(address) for name, address in io.get('extra_write_registers', {}).items()}
+        self.write_count = max([WRITE_COUNT] + [address + 1 for address in self.extra.values()])
+        self.mux = self.address(io['mux_register'])
+        layout = io.get('mux_layout', {})
+        self.mux_banks = layout.get('banks', 1)
+        self.mux_bank_bits = layout.get('bank_bits', 16)
+        self.mux_idle = layout.get('idle_channel', 0)
         self.mux_settle_ms = io['mux_settle_ms']
-        self.outputs = io['outputs']
+        self.di_update_ms = io.get('di_update_ms', 0)
+        # Break-before-make: opened relays must be executed by the MCU loop
+        # before new ones close (never two sources on one pin / AC 36+22 V).
+        self.break_ms = io.get('break_ms', self.di_update_ms)
+        self.dac = io.get('dac')
+        self.interlocks = [list(group) for group in io.get('interlocks', [])]
         self.inputs = io['inputs']
+        self.outputs = dict(io.get('outputs', {}))
+        self.outputs.update(self._matrix_pins(io))
         base = {**io['safe_state'], **io['session']}
-        self._base = {int(WriteRegister[name]): value for name, value in base.items()}
+        self._base = {self.address(name): value for name, value in base.items()}
+        self.relay_registers = {self.address(register) for entry in self.outputs.values()
+                                for register, _ in self.points(entry)}
+
+    def address(self, name):
+        """DO index of a CPUv1.0 register or of a declared firmware extension."""
+        if name in self.extra:
+            return self.extra[name]
+        return int(WriteRegister[name])
+
+    @staticmethod
+    def _matrix_pins(io):
+        sources = io.get('sources', {})
+        pins = {}
+        for board in io.get('matrix_boards', []):
+            inputs = board['size']['inputs']
+            for output, sid in board['outputs'].items():
+                entry = dict(kind='pin', levels=[], dac=None, status=board['status'],
+                             board=board['id'], output=int(output))
+                if board['status'] == 'unsupported':
+                    entry['reason'] = board['reason']
+                for number, name in board['inputs'].items():
+                    index = (int(output) - 1) * inputs + int(number) - 1  # layout "out*N+in"
+                    point = dict(register=board['registers'][index // 16], bit=index % 16, source=name,
+                                 input=int(number))
+                    if sources[name].get('dac'):
+                        entry['dac'] = point
+                    else:
+                        entry['levels'].append(dict(point, value=sources[name]['value']))
+                pins[sid] = entry
+        return pins
+
+    @staticmethod
+    def points(entry):
+        """(register, bit) contacts an output owns; none when unsupported."""
+        if entry.get('status') == 'unsupported':
+            return []
+        if entry.get('kind') == 'bit':
+            return [(entry['register'], entry['bit'])]
+        if entry.get('kind') == 'pin':
+            return [(p['register'], p['bit']) for p in entry['levels'] + ([entry['dac']] if entry['dac'] else [])]
+        return []
 
     def safe_image(self):
         """Session registers (Mode=1 …) plus every owned output switched off."""
@@ -125,9 +188,25 @@ class Stm32IoMap:
             raise UnsupportedSignal(f"{sid}: {entry['reason']}")
         return entry
 
-    @staticmethod
-    def _routed(image, entry):
-        return all(image.get(int(WriteRegister[r['register']]), 0) >> r['bit'] & 1 for r in entry['route'])
+    def input_kind(self, sid):
+        return self._input(sid).get('kind')
+
+    def _is_set(self, image, point):
+        return image.get(self.address(point['register']), 0) >> point['bit'] & 1
+
+    def _set(self, image, register, bit, on):
+        address = self.address(register)
+        word = image.get(address, 0)
+        image[address] = word | 1 << bit if on else word & ~(1 << bit) & 0xFFFF
+
+    def _dac_count(self, sid, value):
+        dac = self.dac
+        if not dac['min'] - 1e-9 <= value <= dac['max'] + 1e-9:
+            raise ValueError(f"{sid}: {value:g} V không có nguồn sẵn và ngoài dải DAC {dac['min']:g}…{dac['max']:g} V.")
+        count = round((value - dac['offset']) / dac['scale'])
+        if not dac['count_min'] <= count <= dac['count_max']:
+            raise ValueError(f'{sid}: mã DAC {count} ngoài giới hạn phần cứng.')
+        return count
 
     def apply(self, image, actions):
         """New image with actions added; raises instead of clamping/guessing."""
@@ -136,31 +215,40 @@ class Stm32IoMap:
             sid, value = action['signal'], action['value']
             entry = self._output(sid)
             if entry['kind'] == 'bit':
-                if not math.isclose(value, entry['on_value'], abs_tol=1e-9):
+                if value is None or ('off_value' in entry and math.isclose(value, entry['off_value'], abs_tol=1e-9)):
+                    self._set(image, entry['register'], entry['bit'], False)
+                elif math.isclose(value, entry['on_value'], abs_tol=1e-9):
+                    self._set(image, entry['register'], entry['bit'], True)
+                else:
                     raise ValueError(f"{sid}: tiếp điểm chỉ cấp {entry['on_value']:g}, không đặt được {value:g}.")
-                address = int(WriteRegister[entry['register']])
-                image[address] = image.get(address, 0) | 1 << entry['bit']
                 continue
-            if not entry['min'] - 1e-9 <= value <= entry['max'] + 1e-9:
-                raise ValueError(f"{sid}: {value:g} ngoài dải {entry['min']:g}…{entry['max']:g}.")
-            count = round((value - entry['offset']) / entry['scale'])
-            if not entry['count_min'] <= count <= entry['count_max']:
-                raise ValueError(f'{sid}: mã DAC {count} ngoài giới hạn phần cứng.')
-            dac = int(WriteRegister[entry['register']])
-            word = encode_int16(count)
+            for register, bit in self.points(entry):  # One source per pin: release all first.
+                self._set(image, register, bit, False)
+            if value is None:
+                continue  # Open circuit.
+            level = next((p for p in entry['levels'] if math.isclose(p['value'], value, abs_tol=1e-9)), None)
+            if level is not None:
+                self._set(image, level['register'], level['bit'], True)
+                continue
+            if entry['dac'] is None or self.dac is None:
+                raise ValueError(f'{sid}: không có nguồn {value:g} V nối tới chân này.')
+            word = encode_int16(self._dac_count(sid, value))
+            dac = self.address(self.dac['register'])
             for other_sid, other in self.outputs.items():
-                if (other_sid != sid and other.get('kind') == 'analog' and other['status'] != 'unsupported'
-                        and other['register'] == entry['register'] and self._routed(image, other)
+                if (other_sid != sid and other.get('kind') == 'pin' and other.get('dac')
+                        and other['status'] != 'unsupported' and self._is_set(image, other['dac'])
                         and image.get(dac, 0) != word):
                     raise ValueError(f'{sid} và {other_sid} cần hai mức khác nhau trên cùng một DAC.')
-            for route in entry['route']:
-                address = int(WriteRegister[route['register']])
-                image[address] = image.get(address, 0) | 1 << route['bit']
+            self._set(image, entry['dac']['register'], entry['dac']['bit'], True)
             image[dac] = word
+        for group in self.interlocks:
+            active = [sid for sid in group if sid in self.outputs
+                      and any(self._is_set(image, dict(register=r, bit=b)) for r, b in self.points(self.outputs[sid]))]
+            if len(active) > 1:
+                raise ValueError('Liên động: không được bật đồng thời ' + ' và '.join(active) + '.')
         return image
 
-    @staticmethod
-    def writes(old, new):
+    def writes(self, old, new):
         """Changed words of ``new`` as contiguous (address, words) runs.
 
         ``old=None`` means the MCU state is unknown: write every owned register.
@@ -173,7 +261,23 @@ class Stm32IoMap:
                 runs[-1][1].append(new[address])
             else:
                 runs.append((address, [new[address]]))
-        return [(address, stm32_write_words(address, words)) for address, words in runs]
+        return [(address, stm32_write_words(address, words, self.write_count)) for address, words in runs]
+
+    def phases(self, old, new):
+        """Break-before-make: ``[opened, new]`` when relays both open and close.
+
+        The runner waits ``break_ms`` after the opening write before closing,
+        so the MCU never drives an old and a new source together.
+        """
+        if old is None:
+            return [new]
+        opened = dict(old)
+        for address in self.relay_registers & set(new):
+            opened[address] = old.get(address, 0) & new[address]
+        closes = any(new[a] & ~opened.get(a, 0) for a in self.relay_registers & set(new))
+        if opened == old or not closes:
+            return [new]
+        return [opened, new]
 
     def unsupported(self, actions=(), signals=()):
         reasons = []
@@ -185,12 +289,22 @@ class Stm32IoMap:
                     reasons.append(reason)
         return reasons
 
+    def mux_word(self, entry=None):
+        """MUX word selecting ``entry``'s channel; other banks stay idle."""
+        word = 0
+        for bank in range(self.mux_banks):
+            channel = entry['mux'] if entry is not None and entry.get('mux_bank', 0) == bank else self.mux_idle
+            word |= channel << (bank * self.mux_bank_bits)
+        return word
+
     def groups(self, signals):
-        """[(mux code | None, [signals])]; one FC03 per group."""
+        """[(MUX word | None, [signals])]; one FC03 per group."""
         groups = {}
         for sid in signals:
             entry = self._input(sid)
-            groups.setdefault(entry.get('mux') if entry['kind'] == 'adc' else None, []).append(sid)
+            if entry['kind'] not in ('adc', 'link'):
+                raise ValueError(f'{sid}: kiểu đo {entry["kind"]} không đọc qua FC03 thường.')
+            groups.setdefault(self.mux_word(entry) if entry['kind'] == 'adc' else None, []).append(sid)
         return list(groups.items())
 
     def decode(self, words, sid):
@@ -211,17 +325,27 @@ class Stm32IoMap:
         return max(0, min(0xFFFF, count))
 
     def inverse(self, image):
-        """Requested stimuli visible in a DO image. Simulator use only."""
+        """Requested stimuli visible in a DO image. Simulator use only.
+
+        A pin with two closed inputs (a short between sources) maps to ``None``.
+        """
         active = {}
         for sid, entry in self.outputs.items():
             if entry['status'] == 'unsupported':
                 continue
             if entry['kind'] == 'bit':
-                if image.get(int(WriteRegister[entry['register']]), 0) >> entry['bit'] & 1:
+                if self._is_set(image, entry):
                     active[sid] = entry['on_value']
-            elif self._routed(image, entry):
-                count = decode_int16(image.get(int(WriteRegister[entry['register']]), 0))
-                active[sid] = round(entry['offset'] + entry['scale'] * count, 9)
+                continue
+            closed = [p for p in entry['levels'] if self._is_set(image, p)]
+            dac_on = entry['dac'] is not None and self._is_set(image, entry['dac'])
+            if len(closed) + dac_on > 1:
+                active[sid] = None
+            elif closed:
+                active[sid] = closed[0]['value']
+            elif dac_on:
+                count = decode_int16(image.get(self.address(self.dac['register']), 0))
+                active[sid] = round(self.dac['offset'] + self.dac['scale'] * count, 9)
         return active
 
 
@@ -523,6 +647,41 @@ def make_read_unit(slave, function, address, count):
         raise ValueError('Vùng đọc vượt quá địa chỉ 65535.')
     kind = QModbusDataUnit.HoldingRegisters if function == 3 else QModbusDataUnit.InputRegisters
     return QModbusDataUnit(kind, address, count)
+
+
+def crc16_modbus(data):
+    """Modbus RTU CRC16 (poly 0xA001, init 0xFFFF); sent low byte first."""
+    crc = 0xFFFF
+    for byte in bytes(data):
+        crc ^= byte
+        for _ in range(8):
+            crc = (crc >> 1) ^ 0xA001 if crc & 1 else crc >> 1
+    return crc
+
+
+def rtu_adu(slave, pdu):
+    """Slave ID + PDU (function code + data, big-endian words) + CRC16 (Lo, Hi)."""
+    body = bytes([slave]) + bytes(pdu)
+    return body + struct.pack('<H', crc16_modbus(body))
+
+
+def split_rtu_adu(raw):
+    """(slave, pdu) of a complete RTU frame; ValueError on short frame or bad CRC."""
+    raw = bytes(raw)
+    if len(raw) < 4:
+        raise ValueError('Khung RTU quá ngắn.')
+    if struct.unpack('<H', raw[-2:])[0] != crc16_modbus(raw[:-2]):
+        raise ValueError('Sai CRC16.')
+    return raw[0], raw[1:-2]
+
+
+def rtu_request_pdu(function, address, values=None, count=None):
+    """PDU a Modbus master sends: FC03/FC04 read, FC06 single write, FC16 multiple write."""
+    if function in (3, 4):
+        return struct.pack('>BHH', function, address, count)
+    if function == 6:
+        return struct.pack('>BHH', 6, address, values[0])
+    return struct.pack('>BHHB', 16, address, len(values), 2 * len(values)) + struct.pack(f'>{len(values)}H', *values)
 
 
 def decode_snapshot(payload, known_signals):

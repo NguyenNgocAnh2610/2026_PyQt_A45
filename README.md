@@ -3,7 +3,8 @@
 Phần mềm giao diện và điều hành giá thử bằng Python + PySide6 (Qt Widgets + QML),
 dùng chung cho nhiều giá thử thông qua **profile JSON**. Cấu hình đầu tiên là
 **A45 / khối 1101K-10** (24 tham số). PC là Modbus RTU Master điều khiển một
-STM32 CPUv1.0 (Slave). Hiện bộ chạy bài chỉ chạy với simulator; chưa thử mạch thật.
+STM32 CPUv1.0 (Slave). Hiện bộ chạy bài chỉ chạy trên cổng COM ảo (STM32 giả lập, khung
+Modbus RTU thật); chưa thử mạch thật.
 
 ## Tài liệu
 
@@ -39,7 +40,9 @@ Nếu shell không activate được, dùng `conda run -n qt_env python ...`.
 ## Sử dụng
 
 ### Kết nối
-- **Mô phỏng** → Kết nối: bộ chạy bài dùng STM32 giả lập (chỉ đọc FC03 để xác nhận, không ghi).
+- **Mô phỏng** → Kết nối: mở **COM ảo** tới STM32 giả lập, chỉ đọc FC03 để xác nhận, không ghi.
+  Mọi giao dịch đi qua đúng đường code của COM thật, với khung Modbus RTU, CRC, timeout và độ trễ
+  vòng lặp MCU. Khi có lỗi (timeout, mất cáp), COM ảo tự đóng như cổng thật, nên phải Kết nối lại.
 - **Modbus RTU / UART** → chọn COM, baudrate → Kết nối: mở COM thật cho **chẩn đoán**
   (đọc một lần, màn hình Hai mảng STM32). Hướng dẫn và quy tắc: [STM32_MODBUS_PC.md mục 6](docs/STM32_MODBUS_PC.md#6-sử-dụng-trên-giao-diện-chẩn-đoán).
 - "Đã mở COM" chỉ là đã mở cổng, chưa xác nhận slave trả lời.
@@ -60,8 +63,13 @@ Nếu shell không activate được, dùng `conda run -n qt_env python ...`.
 Kết quả: PASS, FAIL, ERROR (lỗi giao tiếp/mẫu), BLOCKED (thiếu đặc tả hoặc phần
 cứng chưa đáp ứng), SKIPPED (bài phụ thuộc chưa PASS), ABORTED, Tạm dừng (lần
 chạy bị tạm dừng, đã chạy lại). Profile A45 hiện
-cho **13 PASS mô phỏng, 11 BLOCKED → "Chưa đầy đủ"**
+cho **24/24 PASS mô phỏng** với ánh xạ phần cứng giả định
 (chi tiết: [CONFIGURATION.md](docs/CONFIGURATION.md#hiện-trạng-profile-a45--khối-1101k-10)).
+
+**Nhập tay**: số đo bằng thiết bị ngoài (ví dụ tần số 3 pha ở P01, đo bằng oxilo)
+hiện hộp thoại khi tới bước đó; đầu ra vẫn giữ nguyên trong lúc đo. Để trống hoặc
+bấm "Bỏ qua" thì ghi giá trị chuẩn, kết quả ghi rõ "mặc định, chưa đo". P01/P02
+(nguồn) FAIL thì dừng cả lượt.
 
 ### Màn hình
 - Vùng trạng thái/số đo dựng từ danh mục tín hiệu, lọc theo nhóm/bài. Lọc hay chọn

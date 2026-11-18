@@ -62,8 +62,10 @@ class ProfileTests(unittest.TestCase):
         p = load_profile()
         self.assertEqual([t['id'] for t in p.tests], [f"P{i:02}" for i in range(1, 25)])
         self.assertEqual(len({t['group'] for t in p.tests}), 5)
-        self.assertEqual({t['id'] for t in p.tests if specification_issues(t)}, {'P01', 'P12', 'P16', 'P17', 'P20', 'P21', 'P22', 'P23', 'P24'})
-        self.assertEqual(p.tests[0]['steps'][1]['wait_ms'], 120000)
+        # Open points from the 2026-11-18 questionnaire were settled by the user
+        # (temporary values are marked in each check's "basis").
+        self.assertEqual({t['id'] for t in p.tests if specification_issues(t)}, set())
+        self.assertEqual(sum(s['wait_ms'] for s in p.tests[0]['steps'][:2]), 120000)  # 36 V for 2 minutes.
         self.assertEqual(p.tests[15]['steps'][0]['checks'][0]['signal'], 'xp1_26')
         self.assertGreater(len(p.target['source_paragraphs']), 100)
 
@@ -186,15 +188,19 @@ class BenchTests(unittest.TestCase):
         self.assertEqual(b.attempt['test_id'], 'health')
 
     def test_missing_spec_never_passes_or_sends_apply(self):
-        b = self.backend(load_profile())
+        profile = deepcopy(load_profile())
+        profile.tests[11]['steps'][1]['issues'] = ['Thiếu dung sai (ví dụ).']
+        profile.tests[11]['steps'][1]['checks'][0]['tolerance'] = None
+        b = self.backend(profile)
         b.configure(mode=Mode.MANUAL)
         b.select_test('P12')
         self.run_done(b)
         self.assertEqual(b.attempt['status'], 'BLOCKED')
         self.assertEqual(b.session['verdict'], 'Chưa đầy đủ')
         self.assertIsNone(b.device.communication.transport.last_case)
-        # A45 uses the STM32 runner: a BLOCKED test writes nothing to the banks.
-        self.assertEqual(b.device.stm32_simulator.mod_buf_to_write, [0] * 29)
+        # A45 uses the STM32 runner: a BLOCKED test writes nothing to the banks
+        # (31 words: CPUv1.0 map plus the proposed SW03/SW04 extension).
+        self.assertEqual(b.device.stm32_simulator.mod_buf_to_write, [0] * 31)
 
     def test_busy_guards_and_view_selection_do_not_change_running_test(self):
         b = self.backend()

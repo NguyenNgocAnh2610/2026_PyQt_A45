@@ -142,6 +142,10 @@
     }
   },
   "stm32_description": "Phản hồi mô phỏng của khối theo trạng thái kích thích đọc ngược từ mảng DO đã ghi (không theo mã bài). Giá trị là dữ liệu demo, không phải hiệu chuẩn hay kết quả thật.",
+  "stm32_timing": {
+    "loop_ms": 50,
+    "note": "GIẢ ĐỊNH chu kỳ vòng lặp chính CPUv1.0 cho COM ảo (gửi SW/MUX/Power qua USART1, đọc ADC). Đo thật bằng bài tự kiểm tra D02 rồi chỉnh. hardware.stm32_io.di_update_ms phải >= 2 × loop_ms."
+  },
   "stm32_cases": [
     {
       "when": {
@@ -153,22 +157,24 @@
     },
     {
       "when": {
-        "ac_36v": 1
+        "ac_22v": 1
       },
       "measure": {
         "ac_A": 22,
         "ac_B": 22,
         "ac_C": 22,
         "ac_current": 1.7
-      },
-      "after_ms": 60000
+      }
     },
     {
       "when": {
-        "dc_12v": 1,
-        "dc_15v": 1,
         "dc_27v": 1,
-        "dc_5v": 1
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1
       },
       "measure": {
         "dc_current": 1.37
@@ -176,11 +182,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1
       },
       "measure": {
         "xp1_48": 0.134,
@@ -190,11 +199,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_40": 0.02
       },
       "measure": {
@@ -203,11 +215,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_40": 0.5
       },
       "measure": {
@@ -216,11 +231,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_41": -0.6
       },
       "measure": {
@@ -229,11 +247,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_41": 0.6
       },
       "measure": {
@@ -242,11 +263,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_42": 0.16
       },
       "measure": {
@@ -255,11 +279,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_42": 0.4
       },
       "measure": {
@@ -268,11 +295,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_40": 3
       },
       "measure": {
@@ -281,11 +311,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_40": -3
       },
       "measure": {
@@ -294,11 +327,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_41": 3
       },
       "measure": {
@@ -307,11 +343,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_41": -3
       },
       "measure": {
@@ -320,11 +359,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_42": 3
       },
       "measure": {
@@ -333,11 +375,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_42": -3
       },
       "measure": {
@@ -346,11 +391,122 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
+        "set_43": 4.5,
+        "set_44": 4.5,
+        "set_22": 3
+      },
+      "measure": {
+        "xp1_63": -6.5
+      }
+    },
+    {
+      "when": {
+        "ac_22v": 1,
+        "dc_27v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
+        "set_43": 4.5,
+        "set_44": 4.5,
+        "set_22": -3
+      },
+      "measure": {
+        "xp1_63": 6.5
+      }
+    },
+    {
+      "when": {
+        "ac_22v": 1,
+        "dc_27v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
+        "set_43": 4.5,
+        "set_44": 4.5,
+        "set_32": 3
+      },
+      "measure": {
+        "xp1_56": -6.5
+      }
+    },
+    {
+      "when": {
+        "ac_22v": 1,
+        "dc_27v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
+        "set_43": 4.5,
+        "set_44": 4.5,
+        "set_32": -3
+      },
+      "measure": {
+        "xp1_56": 6.5
+      }
+    },
+    {
+      "when": {
+        "ac_22v": 1,
+        "dc_27v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
+        "set_43": 4.5,
+        "set_44": 4.5,
+        "set_42": 3
+      },
+      "measure": {
+        "xp1_14": -8.5
+      }
+    },
+    {
+      "when": {
+        "ac_22v": 1,
+        "dc_27v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
+        "set_43": 4.5,
+        "set_44": 4.5,
+        "set_42": -3
+      },
+      "measure": {
+        "xp1_14": 8.5
+      }
+    },
+    {
+      "when": {
+        "ac_22v": 1,
+        "dc_27v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_22": 0
       },
       "measure": {
@@ -359,11 +515,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_32": 0
       },
       "measure": {
@@ -372,11 +531,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_22": 3
       },
       "measure": {
@@ -385,11 +547,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_22": -3
       },
       "measure": {
@@ -398,11 +563,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_32": 3
       },
       "measure": {
@@ -411,11 +579,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_32": -3
       },
       "measure": {
@@ -424,11 +595,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_40": 0.4
       },
       "measure": {
@@ -437,11 +611,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_40": -0.4
       },
       "measure": {
@@ -450,11 +627,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_41": 0.4
       },
       "measure": {
@@ -463,11 +643,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_41": -0.3
       },
       "measure": {
@@ -476,11 +659,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_42": 0.14
       },
       "measure": {
@@ -489,11 +675,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_42": 0.09
       },
       "measure": {
@@ -502,11 +691,14 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_42": 0.25
       },
       "measure": {
@@ -515,72 +707,106 @@
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
-        "set_15": 0,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_4": 27,
         "set_40": 0,
         "set_41": 0,
-        "set_42": 0
+        "set_42": 0,
+        "set_15": 0
       },
       "measure": {
-        "xp1_50": 0
+        "xp1_50": 8.5
       }
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
+        "set_4": 27,
+        "set_40": 0,
+        "set_41": 0,
+        "set_42": 0,
         "set_23": 0,
-        "set_4": 27,
-        "set_40": 0,
-        "set_41": 0,
-        "set_42": 0
+        "set_54": 3
       },
       "measure": {
-        "xp1_49": 0
+        "xp1_49": 8.5
       }
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
-        "set_12": 0,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_4": 27,
         "set_40": 0,
         "set_41": 0,
-        "set_42": 0
+        "set_42": 0,
+        "set_23": 0,
+        "set_54": -3
       },
       "measure": {
-        "xp1_50": 0,
-        "xp1_49": 0
+        "xp1_49": -8.5
       }
     },
     {
       "when": {
-        "ac_36v": 1,
-        "dc_12v": 1,
-        "dc_15v": 1,
+        "ac_22v": 1,
         "dc_27v": 1,
-        "dc_5v": 1,
-        "set_13": 5,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
         "set_4": 27,
         "set_40": 0,
         "set_41": 0,
-        "set_42": 0
+        "set_42": 0,
+        "set_12": 0
       },
       "measure": {
-        "xp1_50": 0,
-        "xp1_49": 0
+        "xp1_50": 8.5,
+        "xp1_49": -8.5
+      }
+    },
+    {
+      "when": {
+        "ac_22v": 1,
+        "dc_27v": 1,
+        "dc_15v_pos": 1,
+        "dc_15v_neg": 1,
+        "dc_12v_pos": 1,
+        "dc_12v_neg": 1,
+        "dc_5v_pos": 1,
+        "dc_5v_neg": 1,
+        "set_4": 27,
+        "set_40": 0,
+        "set_41": 0,
+        "set_42": 0,
+        "set_13": 5
+      },
+      "measure": {
+        "xp1_50": 8,
+        "xp1_49": -8
       }
     }
   ]

@@ -10,7 +10,7 @@ hiện trạng, quyết định, việc tiếp theo và lịch sử.
 - Giá thử mới dùng lại phần cứng/khung truyền STM32 CPUv1.0 (người dùng xác nhận).
   PC là Master của **một** STM32 Slave (ID 9); MCU tự điều phối các bo phía dưới.
   Bản đồ mặc định theo CPUv1.0, chỉ sửa khi phát sinh. Giao tiếp: `docs/STM32_MODBUS_PC.md`.
-- Mục "Rà soát 1101K ↔ CPUv1.0" bên dưới là danh sách cần hỏi phần cứng/firmware.
+- Mục "Cần kiểm khi lên phần cứng thật" bên dưới là danh sách điểm giả định phải kiểm khi đi dây/chạy mạch.
 - Người dùng cho phép dùng skill `multi-agent-orchestrator` cho cả việc code và ngoài code.
 
 ## Hiện trạng
@@ -18,61 +18,81 @@ hiện trạng, quyết định, việc tiếp theo và lịch sử.
   - Login → MainWindow (Widgets + QML), 3 chế độ chạy, lưu phiên nguyên tử.
   - Profile JSON dùng chung, kèm validator tập trung.
   - Kết nối COM thật (Modbus RTU/UART) để chẩn đoán, màn hình hai mảng STM32.
-  - Bộ chạy bài 1101K qua hai mảng STM32 (adapter `stm32`) với simulator mức thanh ghi.
+  - Bộ chạy bài 1101K qua hai mảng STM32 (adapter `stm32`).
+  - Mô phỏng chạy trên **cổng COM ảo**: cùng `SerialConnection`/`Device` như COM thật, khung
+    Modbus RTU + CRC thật, slave giả lập theo FreeModbus, mô phỏng vòng lặp CPU (`loop_ms` giả định 50 ms).
+    Khi ghép mạch thật chỉ khác client Modbus.
   - Tạm dừng/Tiếp tục thật trong backend (cả adapter stm32 và mock):
     - Tạm dừng = về an toàn, lần chạy ghi PAUSED (không tính kết quả); tiếp tục = chạy lại bài từ đầu.
     - Phiên đang tạm dừng mà tắt app sẽ được ghi là gián đoạn.
   - Dashboard giữ giá trị cuối: số đo kèm PASS/FAIL, yêu cầu kèm ACK, cùng bài/bước · giờ; xóa khi đo lại/Phiên mới.
-- **Kết quả mô phỏng tự động A45:** 13 PASS (P02–P09, P13–P15, P18, P19), 11 BLOCKED → "Chưa đầy đủ".
+  - Ánh xạ phần cứng theo phiếu xác nhận 2026-11-18: rơ-le nguồn 12 kênh, 2 bo matrix 8×4 (bo 2 cần sửa FW CPU), DOUT,
+    MUX số kênh; ngắt trước đóng sau, liên động AC 36/22 V, nhập tay tần số, kiểm trị tuyệt đối, dừng lượt khi P01/P02 FAIL;
+    tự kiểm tra D01 truyền thông, D02 chu kỳ vòng lặp CPU.
+- **Kết quả mô phỏng tự động A45:** 24/24 PASS (bỏ trống tần số → "có giá trị mặc định chưa đo"). Tự kiểm tra: D01, D02 PASS,
+  D03 BLOCKED (chưa định nghĩa).
 - **Chưa có:** đường chạy bài trên mạch thật (`production_ready=false`); ánh xạ
-  `hardware.stm32_io` toàn bộ là `assumed`; chưa thử trên mạch thật.
+  `hardware.stm32_io` toàn bộ là `assumed`; phần cứng chưa đi dây; chưa thử trên mạch thật.
 - Adapter `mock` + giao thức A45 v1 cũ chỉ còn cho cấu hình thứ hai trong test và
   chẩn đoán cũ (phụ lục A `docs/STM32_MODBUS_PC.md`).
 
 ## Đang làm
-- Không có việc dở.
+- Không có việc dở. Đợt 2026-11-18 (áp dụng phiếu xác nhận) đã xong, chờ người dùng xem và đi dây theo mục 9.10.
 
-## Rà soát 1101K ↔ CPUv1.0 (cần xác nhận với phần cứng/firmware)
-Các lỗi demo cũ đã sửa ngày 2026-11-17:
-- P01/P02 không có lệnh cấp nguồn (`actions: []`); P03–P24 không cấp nguồn cho khối.
-- Số đo mock trả theo mã bài, không theo lệnh đã gửi.
-- Bộ chạy bài đi mailbox A45 v1, không dùng hai mảng của MCU.
-- Chưa có ánh xạ tín hiệu ↔ thanh ghi.
-- Điều kiện chung nhóm V và xung 43/44XP1 chưa được mô hình hóa.
+## Cần kiểm khi lên phần cứng thật
+Ánh xạ trong `configs/a45/hardware.json` → `stm32_io` là **bảng phân bổ để đi dây** (2026-11-18, theo phiếu xác nhận;
+bảng ở `docs/STM32_MODBUS_PC.md` mục 9.10). Mọi mục `assumed`. Khi lên mạch, kiểm từng điểm, đạt thì đổi `verified`.
 
-Các điểm CPUv1.0 chưa đáp ứng hoặc chưa rõ. Mỗi điểm đang là chỗ giữ `assumed` hoặc
-`unsupported` trong `configs/a45/hardware.json` → `stm32_io`:
-1. Nguồn AC 3 pha ~36 V/1000 Hz: `Power` CPUv1.0 không có bit AC (đang giữ bit0).
-   Ai chuyển 36 V → 22 V sau 2 phút? P01 vẫn BLOCKED vì thiếu dung sai và không đo được tần số.
-2. DC +27, ±15, ±12, ±5 V: CPUv1.0 chỉ có 24/12/5/3,3 V, không có cực âm, không có 15 V.
-   Đang giữ bit1/3/2/4, giả định một bit bật cả cặp ±.
-3. Đo dòng AC/DC: không có kênh dòng; đang giả định cảm biến 1 V/A → ADC4 qua MUX 1/2.
-4. Điện áp AC từng pha: ADC đo DC/100 (giả định có bộ chuyển RMS, ADC0, MUX 3–5).
-   **Không đo được tần số** → `hz_A/B/C` unsupported.
-5. Kích thích analog 22/32/40/41/42/54XP1 (0,02…±3 V): chỉ có 1 DAC PA4.
-   - Đang giả định −5 mV/mã, mã 0 → 0 V, định tuyến SW02.bit1–6.
-   - Cần hệ số tầng ra thật, mức điện thực tế của DAC_val=0 và bit định tuyến.
-   - Mỗi thời điểm chỉ có một mức analog.
-6. Xung vuông 10 kHz 4,5 Vpp tại 43/44XP1: bộ phát encoder ≤ 250 Hz → unsupported,
-   **P10/P11/P12 BLOCKED**. Cần PWM/timer phần cứng hoặc firmware mới.
-7. Lệnh mức tại 4 (27 V), 12, 13 (5 V), 15, 23XP1: đang giữ SW01.bit0–4,
-   tránh bit 5/6/7/12/14 mà HMI CPUv1.0 dùng.
-8. Đo 13 chân XP1:
-   - MUX CPUv1.0 dạng bit (bit1 = R+); mã kênh 6–18 và thời gian ổn định 20 ms là giả định.
-   - 34/37/48XP1 (0,1–0,45 V, dung sai ±0,05 V) đọc ADC4 ±7,5 V, độ phân giải 0,01 V: sát dung sai.
-   - Các chân ±9 V đọc ADC3 ±12 V.
-9. MCU không có tín hiệu fault/bảo vệ, không xác nhận đã thực thi, không có timestamp mẫu; Mode ở DI luôn 0.
-10. Cần xác nhận `Plan` khi chạy bài (đang dùng 2 = Test) và safe_state (mọi thanh ghi = 0).
-11. Trình tự cấp/ngắt nguồn (`sequences`): đang bật mọi nguồn trong một lần ghi `Power`.
-    Cleanup ghi DAC=0 trước khi ngắt định tuyến (theo thứ tự địa chỉ); cần xác nhận cách này chấp nhận được.
-12. P21: ±3 V tại 54XP1 chưa đưa vào action (giữ issue). Tự kiểm tra D02/D03 chưa được định nghĩa.
+Bo matrix
+1. Bit nào ứng với điểm giao nào. Đang giả định bit = (đầu ra − 1) × 8 + (đầu vào − 1). Sai thì phải tính lại đầu vào
+   nào để trống vì HMI (đang để trống 1/5/7 của matrix 1). Kiểm: ghi từng bit `SW01`/`SW02`, đo thông mạch.
+2. Bo matrix 2 (và 3–4 nếu thêm) **cần sửa firmware CPU**: tăng `DOsize`, gửi `SW03`/`SW04` (index 29/30) tới bo ID mới
+   (đề xuất 5). ID các bo con có thể đổi theo số bo. Chưa sửa thì 32/54/43/44XP1 không điều khiển được (P10–P12, P14, P16,
+   P21 cần chúng). Muốn khóa các bài này: đặt `matrix_boards[1].status = "unsupported"`.
+
+Bo MUX
+3. Word `MUX` chọn 2 kênh thế nào (giả định byte thấp = MUX1, byte cao = MUX2), hai đầu ra vào ADC nào (giả định MUX1 →
+   `ADC3`), kênh nào hở hết.
+4. Kênh 31 (`Mux1.32` = `0x0000`) có thật sự hở hết không (đang dùng làm an toàn, `safe_state.MUX = 0x1F1F`).
+5. Bo MUX nhận số kênh 0–31 hay mẫu rơ-le (đang giả định số kênh, bo tự tra `Mux_Decoder`). Mã HMI của CPU đặt `MUX`
+   bit 1 = 2, tức chọn kênh 2 khi `Mode ≠ 1` (vô hại vì chỉ là đo).
+
+Đo lường
+6. Kênh ADC và hệ số module đo dòng/áp AC/DC (giả định 1 V/A, 0,1 V/V, qua MUX1 kênh 13–17). Module áp AC phải ra DC tỉ lệ RMS.
+7. `ADC3` ±12 V, bước 0,01 V cho chân nhỏ 34/37/48XP1 (0,1–0,45 V, dung sai ±0,05 V): sát; người dùng chấp nhận một lần đọc.
+
+Kích thích
+8. DAC: giả định tầng có trừ 1,62 V, `V_XP1 = −DAC_val × 1,55 mV`. Đo bảng 5 điểm (`DAC_val` −1000…1000) rồi sửa
+   `stm32_io.dac`; offset vài mV là lớn so với 0,02 V của P04.
+9. `DOUT` bit 0–4 cần tầng driver/rơ-le cho 4/12/13/15/23XP1.
+10. 43/44XP1 đang dùng chung một nguồn xung (đầu vào 4 của matrix 2); chưa rõ hai chân cần cùng pha, ngược pha hay hai nguồn.
+
+Nguồn
+11. `Power` bit 1/2/4/6 (đang gán AC 22 V, +27, −15, −12 V) bị nút HMI bật/tắt khi `Mode ≠ 1`. Bit 7–9 để trống vì bị ép bật.
+    Kiểm trên mạch hoặc sửa FW (mặc định an toàn khi khởi động).
+
+Firmware CPU (người dùng cho phép sửa sau, chưa sửa; đề xuất ở STM32_MODBUS_PC mục 9.9)
+12. - FW-01 chu kỳ vòng lặp: đo bằng bài tự kiểm tra **D02**; `di_update_ms` đã nâng 100 → 150 ms, `break_ms` 150 ms, ngưỡng
+      D02 ≤ 75 ms (= `di_update_ms`/2). Đổi một số thì đổi cả ba và `mock.json` `stm32_timing.loop_ms`.
+    - FW-03: reset/`Mode ≠ 1` → HMI tự bật bit (mục 11 và bo matrix ở mục 1); PC không phát hiện được MCU reset.
+    - FW-04: `Error_M` (lỗi bo con) không báo lên PC; ACK không chứng minh rơ-le đã đóng.
+    - FW-05: firmware nhận tới 128 thanh ghi trong khi mảng có 32 → ghi ngoài vùng đè RAM. PC tự chặn.
+    - FW-06: `Plan = 2`; `Plan = 0` cấu hình lại GPIO mỗi vòng.
+    - FW-07: không có watchdog khi mất PC; người dùng chấp nhận, dùng dừng khẩn/atomat/cầu chì phần cứng.
+    - `main.c:464` ghi bit 31 vào biến 16 bit (không tác dụng).
+
+Bài kiểm tra (giá trị tạm do người dùng chỉ định 2026-11-18, ghi ở `basis` của từng check)
+13. NG-03 áp 22 ± 2 V; P12/P17 dung sai thiếu = ±0,2 V; P20 kiểm trị tuyệt đối; P22–P24 dấu tạm (50XP1 dương, 49XP1 âm);
+    NG-07 đo dòng khởi động tại 1 s; mỗi bước chờ 250 ms.
+14. Giữ đúng tài liệu nhưng còn nghi vấn: P16 đo 26XP1 (P14 dùng 25XP1), P18 −0,3 V, P23 "không có CX3" nhưng vẫn cấp 5 V.
 
 ## Tiếp theo
-- Hỏi phần cứng/firmware 12 điểm trên; điền bit/kênh/hệ số thật vào `stm32_io`
-  (chỉ đổi thành `verified` sau khi đo kiểm).
-- Ghép RS485, đọc DI bằng màn hình hai mảng, đối chiếu số đo, thử mất cáp/timeout.
+- Đi dây theo `docs/STM32_MODBUS_PC.md` mục 9.10; kiểm 14 điểm ở mục trên, đổi `verified` từng mục đã đo.
+- Sửa firmware CPU cho bo matrix 2 (`SW03`/`SW04`) và thống nhất cách chọn MUX 2 kênh (mục 9.9).
+- Ghép RS485, chạy tự kiểm tra D01/D02 trên mạch, chỉnh `di_update_ms`/`break_ms`/ngưỡng D02 theo chu kỳ đo được.
+- Đo hiệu chuẩn DAC 5 điểm; xác nhận dấu P22–P24 và các dung sai tạm.
+- Bổ sung bài tự kiểm tra (D03 ADC…) khi người dùng yêu cầu.
 - Thiết kế đường chạy bài trên mạch thật (điều kiện: `docs/STM32_MODBUS_PC.md` mục 10).
-- Tùy chọn: hiển thị giá trị yêu cầu đã ACK trên dashboard (hiện "Chưa biết" với adapter stm32).
 
 ## Vấn đề còn mở
 - File chưa xóa, chờ người dùng xem xét:
@@ -81,14 +101,45 @@ Các điểm CPUv1.0 chưa đáp ứng hoặc chưa rõ. Mỗi điểm đang là
   - `cmd`, `git_daily.ps1`, `git_daily.sh`: tiện ích Git cá nhân, chưa rõ còn dùng không.
   - `captures/*.png`: ảnh đối chiếu preview.
 - `docs/TECHNICAL_REVIEW.md` không còn trên đĩa từ trước; không tự khôi phục.
-- Mã nguồn C của firmware chưa có trên máy; chưa đối chiếu C trực tiếp.
+- Firmware bo CPU có tại `D:\project\2026_DT_Chinh\Program\CPUv1.0` (đã đối chiếu 2026-11-18). Firmware và sơ đồ
+  các bo con chưa có.
+- Đợt 2026-11-18 (áp dụng phiếu) Claude làm trực tiếp, không gọi worker: Codex hết hạn mức tới 2026-11-19 11:01,
+  Antigravity headless không chạy được lệnh.
+- `tests/preview_main.py`: thêm `--state manual` (chụp hộp thoại nhập tay); các trạng thái khác tự bỏ trống nhập tay.
+- Worker của orchestrator không dùng được cho việc đọc firmware:
+  - Codex báo hết hạn mức tới 2026-11-19 11:01.
+  - Antigravity ở chế độ headless bị từ chối lệnh shell và đọc file ngoài repo.
+  - Worktree tạm `../GUI-wt-fwreview` (detached, chỉ có file task) có thể xóa bằng `git worktree remove`.
 - `tests/preview_main.py --scenario` vẫn liệt kê `stale`/`protection`; với adapter stm32 backend sẽ từ chối.
 - Khi đang tạm dừng, màn hình chẩn đoán hai mảng vẫn bị khóa (backend coi là đang bận).
 - Nút "Tạm dừng" của đồ thị demo trùng tên với nút Tạm dừng quy trình; cân nhắc đổi tên.
+- Ví dụ CRC trong `docs/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md` sai (giữ nguyên file nguồn).
+  - Khung đúng ghi ở `docs/STM32_MODBUS_PC.md` mục 11.
+  - Thêm: FC03 bo HMI `04 03 00 00 00 05` có CRC đúng là `85 9C`, không phải `84 5C`.
 - Hai backend cùng một thư mục lưu có thể xung đột ghi (Windows "Access is denied") khi
   phiên còn đang lưu; thực tế chỉ chạy một ứng dụng, test đã tách cho đúng cách dùng.
 
 ## Kiểm chứng gần nhất
+- 2026-11-18, áp dụng phiếu xác nhận: `python -B -m unittest discover -s tests` đạt **147/147** (trước khi sửa 138/138);
+  `tests.test_stm32_bench` chạy lại thêm 2 lần đều đạt (test có phụ thuộc thời gian thực). Test mới:
+  - kiểu `pin`/bo matrix: chọn một nguồn, nhả khi `null`, DAC, không có nguồn → lỗi, một DAC, liên động AC 36/22 V;
+  - không output nào dùng bit HMI ép bật; ngắt trước đóng sau (P01 đổi 36 → 22 V cách ≥ `break_ms`, không lúc nào cả hai);
+  - validator: bit HMI, chân ở hai bo, thanh ghi mở rộng sai, MUX an toàn sai, kênh idle, bước đo không check, `absolute`;
+  - simulator: chập hai nguồn → không khớp case, lượng tử DAC, thanh ghi mở rộng, nhiễu ADC2 theo vòng lặp;
+  - runner: P02, 24/24 PASS tự động, bo unsupported → BLOCKED không ghi gì, P01 FAIL dừng cả lượt, nhập tay (có nhập,
+    bỏ trống → mặc định, tạm dừng khi đang chờ), D01/D02 đo chu kỳ ≈ `loop_ms`.
+
+  Preview: hộp thoại nhập tay (`--state manual`), chạy tự động ×10 → 24/24 PASS, preview hai mảng. Chưa thử trên mạch thật.
+- 2026-11-18, cổng COM ảo: `python -B -m unittest discover -s tests` đạt **138/138** (thêm 14 test trong
+  `tests/test_virtual_port.py`):
+  - CRC theo vector chuẩn;
+  - slave FreeModbus: im lặng khi sai CRC/slave, exception 01/02/03;
+  - độ trễ vòng lặp CPU;
+  - SerialConnection qua COM ảo: đọc/ghi, exception, timeout đóng cổng, rút cáp;
+  - bộ chạy bài P02 qua COM ảo; thời gian chờ quá ngắn → FAIL.
+
+  Preview hai mảng hiện khung TX/RX; preview chạy tự động: 13 PASS / 11 BLOCKED như trước.
+  Chưa thử trên mạch thật.
 - 2026-11-18, tạm dừng + giữ giá trị: `python -B -m unittest discover -s tests` đạt
   **124/124**. Test mới gồm:
   - tạm dừng về safe_state, không ghi gì khi đang tạm dừng, tiếp tục chạy lại từ prepare, verdict PASS;
@@ -103,6 +154,31 @@ Các điểm CPUv1.0 chưa đáp ứng hoặc chưa rõ. Mỗi điểm đang là
   **120/120**; preview màn hình chính đã xem. Chưa thử trên mạch thật.
 
 ## Lịch sử ngắn
+- 2026-11-18: sửa lỗi người dùng báo: nhập tay tần số ở P01 (có nhập hay bỏ trống) đều ra ERROR "Mẫu thiếu, lỗi hoặc hết
+  hạn". Nguyên nhân: số đo tự động của cùng bước (áp 3 pha, dòng) đọc trước khi hộp thoại hiện, quá `stale_ms` (1 s) khi
+  người vận hành trả lời. Sửa: giữ nguyên các số đo đó lúc mở hộp thoại và đánh giá theo thời điểm đọc (`_manual_frozen`).
+  Test hồi quy trả lời sau 2,5 s; 148/148 test.
+- 2026-11-18: áp dụng phiếu xác nhận `docs/CAN_XAC_NHAN_TAM.md` (đã xóa sau khi chuyển hết nội dung vào cấu hình, tài liệu
+  và mục "Cần kiểm khi lên phần cứng thật").
+  - Cấu hình A45: rơ-le nguồn 12 kênh (mỗi cực DC một rơ-le, AC 36/22 V hai rơ-le có liên động), 2 bo matrix 8×4 qua
+    `matrix_boards`/`sources`, lệnh mức trên `DOUT`, DAC ±1,5 V, MUX số kênh 2 bank, `di_update_ms` 100 → 150, `break_ms`.
+  - Lõi: output `pin`, `off_value`/`null`, ngắt trước đóng sau, `interlocks`, `hmi_forced_bits`, `extra_write_registers`
+    (`SW03`/`SW04` = đề xuất sửa FW), input `manual` + hộp thoại `src/ui/widgets/manual_input.py`, `loop_probe` (D02),
+    check `absolute`, bài `stop_on_fail`, bước `stimulate` không đo.
+  - 24 bài theo quyết định của người dùng (P01 3 bước, P21 hai bước, dung sai/dấu tạm có `basis`), không còn `issues`.
+  - Tài liệu: STM32_MODBUS_PC mục 7, 8, 9.9, **9.10 (bảng đi dây)**, 10; CONFIGURATION; CHUYEN_GIA_THU_MOI mục 3a; README; CLAUDE.
+  - Backup: `.backup/GUI_2026-11-18_23-11-36_UTC+07_before-apply-questionnaire.zip`. 147/147 test.
+- 2026-11-18: rà soát firmware CPUv1.0 từ mã nguồn, gộp vào `docs/STM32_MODBUS_PC.md` mục 9 (luồng PC → CPU → bo con, vòng lặp
+  và thời gian, bus USART1, chân DOUT/DIN/DAC/ADC, HMI mode/reset, stack slave, hướng dẫn điều khiển một rơ-le).
+  Sửa trong tài liệu: SSI Enable là bit 15 (không phải bit 8); cập nhật lại các mục COM ảo bị mất khi tài liệu được viết lại.
+  Chỉ sửa tài liệu, không sửa mã.
+- 2026-11-18: mô phỏng STM32 = cổng COM ảo (`src/virtual_port.py`, `Stm32RtuSlave`, vòng lặp CPU `loop_ms`).
+  - Bỏ đường mô phỏng đi tắt trong `Device`.
+  - Kịch bản lỗi tạo trên đường truyền; timeout đóng COM ảo như cổng thật.
+  - Đo chờ `di_update_ms + mux_settle_ms` kể từ ACK ghi cuối.
+  - Màn hình hai mảng hiện khung RTU TX/RX.
+  - Sửa lỗi `MainWindow._shutdown_ready`: `QTimer.singleShot` thiếu context làm lỗi rò sang test sau khi cửa sổ đã bị xóa.
+  - Backup: `.backup/GUI_2026-11-18_06-57-11_UTC+07_before-virtual-com-port.zip` (807 file, CRC OK).
 - 2026-11-18: nút Tạm dừng/Tiếp tục (logic thật trong backend), giữ giá trị tín hiệu sau khi bài xong,
   làm mới giao diện (nút có gradient/trạng thái, LED có quầng sáng, thẻ số đo chữ lớn + chip kết quả).
   Preview thêm `--state paused`. Backup: `.backup/GUI_2026-11-18_00-32-58_UTC+07_before-pause-and-signal-history.zip`.

@@ -505,6 +505,27 @@
       }
     },
     {
+      "id": "ac_22v",
+      "label": "Lệnh nguồn AC 3 pha ~22 V / 1000 Hz",
+      "group": "Lệnh nguồn",
+      "unit": "",
+      "kind": "boolean",
+      "source": "derived",
+      "decimals": 0,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
       "id": "dc_27v",
       "label": "Lệnh nguồn DC +27 V",
       "group": "Lệnh nguồn",
@@ -526,8 +547,8 @@
       }
     },
     {
-      "id": "dc_15v",
-      "label": "Lệnh nguồn DC ±15 V",
+      "id": "dc_15v_pos",
+      "label": "Lệnh nguồn DC +15 V",
       "group": "Lệnh nguồn",
       "unit": "",
       "kind": "boolean",
@@ -547,8 +568,8 @@
       }
     },
     {
-      "id": "dc_12v",
-      "label": "Lệnh nguồn DC ±12 V",
+      "id": "dc_15v_neg",
+      "label": "Lệnh nguồn DC −15 V",
       "group": "Lệnh nguồn",
       "unit": "",
       "kind": "boolean",
@@ -568,8 +589,71 @@
       }
     },
     {
-      "id": "dc_5v",
-      "label": "Lệnh nguồn DC ±5 V",
+      "id": "dc_12v_pos",
+      "label": "Lệnh nguồn DC +12 V",
+      "group": "Lệnh nguồn",
+      "unit": "",
+      "kind": "boolean",
+      "source": "derived",
+      "decimals": 0,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "dc_12v_neg",
+      "label": "Lệnh nguồn DC −12 V",
+      "group": "Lệnh nguồn",
+      "unit": "",
+      "kind": "boolean",
+      "source": "derived",
+      "decimals": 0,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "dc_5v_pos",
+      "label": "Lệnh nguồn DC +5 V",
+      "group": "Lệnh nguồn",
+      "unit": "",
+      "kind": "boolean",
+      "source": "derived",
+      "decimals": 0,
+      "stale_ms": 1000,
+      "chart": false,
+      "states": {
+        "0": {
+          "label": "TẮT",
+          "color": "#8194a7"
+        },
+        "1": {
+          "label": "BẬT",
+          "color": "#26ed86"
+        }
+      }
+    },
+    {
+      "id": "dc_5v_neg",
+      "label": "Lệnh nguồn DC −5 V",
       "group": "Lệnh nguồn",
       "unit": "",
       "kind": "boolean",
@@ -590,8 +674,8 @@
     },
     {
       "id": "diag_link",
-      "label": "Truyền thông demo",
-      "group": "Tự kiểm tra mô phỏng",
+      "label": "Truyền thông CPU",
+      "group": "Tự kiểm tra giá thử",
       "unit": "",
       "kind": "boolean",
       "source": "confirmed",
@@ -610,30 +694,21 @@
       }
     },
     {
-      "id": "diag_io",
-      "label": "I/O demo",
-      "group": "Tự kiểm tra mô phỏng",
-      "unit": "",
-      "kind": "boolean",
-      "source": "confirmed",
-      "decimals": 2,
-      "stale_ms": 1000,
+      "id": "diag_loop",
+      "label": "Chu kỳ vòng lặp CPU",
+      "group": "Tự kiểm tra giá thử",
+      "unit": "ms",
+      "kind": "number",
+      "source": "measured",
+      "decimals": 1,
+      "stale_ms": 3000,
       "chart": false,
-      "states": {
-        "0": {
-          "label": "TẮT",
-          "color": "#8194a7"
-        },
-        "1": {
-          "label": "BẬT",
-          "color": "#26ed86"
-        }
-      }
+      "states": {}
     },
     {
       "id": "diag_adc",
-      "label": "Thu mẫu demo",
-      "group": "Tự kiểm tra mô phỏng",
+      "label": "Thu mẫu ADC (chưa định nghĩa)",
+      "group": "Tự kiểm tra giá thử",
       "unit": "",
       "kind": "boolean",
       "source": "confirmed",
@@ -655,9 +730,9 @@
   "diagnostics": [
     {
       "id": "D01",
-      "name": "Phản hồi truyền thông (demo)",
-      "group": "Tự kiểm tra giá thử · DEMO",
-      "source": "Kịch bản minh họa, chưa phải tiêu chuẩn giá thử",
+      "name": "Truyền thông CPU (FC03 + ghi có ACK)",
+      "group": "Tự kiểm tra giá thử · cơ bản",
+      "source": "Tự kiểm tra cơ bản theo yêu cầu người dùng (BT-13, 2026-11-18); chỉ kiểm giá thử, chưa cần khối.",
       "dependencies": [],
       "independence": "mock_only",
       "preparation": "none",
@@ -666,11 +741,11 @@
       "steps": [
         {
           "id": "S01",
-          "title": "Phản hồi truyền thông",
+          "title": "Ghi Mode/trạng thái an toàn (ACK) rồi đọc FC03",
           "capability": "diagnose",
           "actions": [],
           "wait_ms": 250,
-          "timing_basis": "demo",
+          "timing_basis": "Không phụ thuộc thời gian; chỉ cần phản hồi hợp lệ.",
           "checks": [
             {
               "signal": "diag_link",
@@ -685,9 +760,9 @@
     },
     {
       "id": "D02",
-      "name": "Trạng thái I/O (demo)",
-      "group": "Tự kiểm tra giá thử · DEMO",
-      "source": "Kịch bản minh họa, chưa phải tiêu chuẩn giá thử",
+      "name": "Chu kỳ vòng lặp CPU",
+      "group": "Tự kiểm tra giá thử · cơ bản",
+      "source": "Tự kiểm tra cơ bản theo yêu cầu người dùng (BT-13, 2026-11-18); chỉ kiểm giá thử, chưa cần khối.",
       "dependencies": [],
       "independence": "mock_only",
       "preparation": "none",
@@ -696,17 +771,18 @@
       "steps": [
         {
           "id": "S01",
-          "title": "Trạng thái I/O",
+          "title": "Đọc FC03 liên tục 2 s, ước lượng chu kỳ từ lúc ADC đổi giá trị",
           "capability": "diagnose",
           "actions": [],
           "wait_ms": 250,
-          "timing_basis": "demo",
+          "timing_basis": "Đo theo thời gian thực, không theo hệ số mô phỏng.",
           "checks": [
             {
-              "signal": "diag_io",
-              "nominal": 1,
-              "tolerance": 0,
-              "unit": ""
+              "signal": "diag_loop",
+              "nominal": 37.5,
+              "tolerance": 37.5,
+              "unit": "ms",
+              "basis": "Ngưỡng suy ra từ cấu hình, không phải dung sai tự đặt: chu kỳ ≤ di_update_ms/2 (150/2 = 75 ms) để DI phản ánh lệnh trong thời gian bộ chạy bài chờ. Đổi di_update_ms thì đổi ngưỡng này."
             }
           ],
           "issues": []
@@ -715,9 +791,9 @@
     },
     {
       "id": "D03",
-      "name": "Thu mẫu (demo)",
-      "group": "Tự kiểm tra giá thử · DEMO",
-      "source": "Kịch bản minh họa, chưa phải tiêu chuẩn giá thử",
+      "name": "Thu mẫu ADC (chưa định nghĩa)",
+      "group": "Tự kiểm tra giá thử · cơ bản",
+      "source": "Tự kiểm tra cơ bản theo yêu cầu người dùng (BT-13, 2026-11-18); chỉ kiểm giá thử, chưa cần khối.",
       "dependencies": [],
       "independence": "mock_only",
       "preparation": "none",

@@ -137,7 +137,8 @@
   ],
   "limitations": [
     "Bộ chạy bài ghi/đọc hai mảng STM32 (giả lập mức thanh ghi); ánh xạ thanh ghi, trình tự nguồn và thời gian ổn định là GIẢ ĐỊNH, chưa xác minh phần cứng.",
-    "Xung 10 kHz, đo tần số và các tín hiệu bảo vệ chưa có trên CPUv1.0; các bài liên quan giữ BLOCKED."
+    "Ánh xạ phần cứng là bảng phân bổ để đi dây (2026-11-18), chưa xác minh; bo matrix 2 cần sửa firmware CPU.",
+    "Tần số 3 pha nhập tay từ oxilo; bỏ trống thì ghi giá trị danh định kèm nhãn \"mặc định, chưa đo\"."
   ],
   "tests": [
     {
@@ -154,7 +155,7 @@
       "steps": [
         {
           "id": "S01",
-          "title": "Khởi động ~36 V / 1000 Hz",
+          "title": "Bật rơ-le 1: ~36 V / 1000 Hz; đo dòng khởi động sau 1 s",
           "capability": "stimulate_measure",
           "actions": [
             {
@@ -162,8 +163,8 @@
               "value": 1
             }
           ],
-          "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "wait_ms": 1000,
+          "timing_basis": "NG-07: đo một lần 1 s sau khi cấp nguồn (người dùng chọn, có thể chỉnh)",
           "checks": [
             {
               "signal": "ac_current",
@@ -176,29 +177,51 @@
         },
         {
           "id": "S02",
-          "title": "Sau 120 giây: pha A/B/C và dòng tiêu thụ",
-          "capability": "stimulate_measure",
+          "title": "Giữ ~36 V cho đủ 2 phút",
+          "capability": "stimulate",
           "actions": [],
-          "wait_ms": 120000,
-          "timing_basis": "Tiêu chuẩn",
+          "wait_ms": 119000,
+          "timing_basis": "Tiêu chuẩn: chuyển sang 22 V sau 2 phút (1 s ở S01 + 119 s)",
+          "checks": [],
+          "issues": []
+        },
+        {
+          "id": "S03",
+          "title": "Ngắt rơ-le 1, bật rơ-le 2: ~22 V; đo pha A/B/C, tần số và dòng",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "ac_36v",
+              "value": 0
+            },
+            {
+              "signal": "ac_22v",
+              "value": 1
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng; ngắt trước đóng sau do bộ chạy bài thực hiện",
           "checks": [
             {
               "signal": "ac_A",
               "nominal": 22,
-              "tolerance": null,
-              "unit": "V"
+              "tolerance": 2,
+              "unit": "V",
+              "basis": "NG-03: ±2 V người dùng chỉ định tạm 2026-11-18"
             },
             {
               "signal": "ac_B",
               "nominal": 22,
-              "tolerance": null,
-              "unit": "V"
+              "tolerance": 2,
+              "unit": "V",
+              "basis": "NG-03: ±2 V người dùng chỉ định tạm 2026-11-18"
             },
             {
               "signal": "ac_C",
               "nominal": 22,
-              "tolerance": null,
-              "unit": "V"
+              "tolerance": 2,
+              "unit": "V",
+              "basis": "NG-03: ±2 V người dùng chỉ định tạm 2026-11-18"
             },
             {
               "signal": "hz_A",
@@ -225,11 +248,10 @@
               "unit": "A"
             }
           ],
-          "issues": [
-            "Chưa rõ thao tác chuyển 36 V sang 22 V; thiếu dung sai điện áp."
-          ]
+          "issues": []
         }
-      ]
+      ],
+      "stop_on_fail": true
     },
     {
       "id": "P02",
@@ -245,7 +267,7 @@
       "steps": [
         {
           "id": "S01",
-          "title": "Cấp +27 V, ±15 V, ±12 V, ±5 V; đo dòng",
+          "title": "Cấp +27 V, ±15 V, ±12 V, ±5 V (mỗi cực một rơ-le); đo dòng",
           "capability": "stimulate_measure",
           "actions": [
             {
@@ -253,20 +275,32 @@
               "value": 1
             },
             {
-              "signal": "dc_15v",
+              "signal": "dc_15v_pos",
               "value": 1
             },
             {
-              "signal": "dc_12v",
+              "signal": "dc_15v_neg",
               "value": 1
             },
             {
-              "signal": "dc_5v",
+              "signal": "dc_12v_pos",
+              "value": 1
+            },
+            {
+              "signal": "dc_12v_neg",
+              "value": 1
+            },
+            {
+              "signal": "dc_5v_pos",
+              "value": 1
+            },
+            {
+              "signal": "dc_5v_neg",
               "value": 1
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "dc_current",
@@ -277,7 +311,8 @@
           ],
           "issues": []
         }
-      ]
+      ],
+      "stop_on_fail": true
     },
     {
       "id": "P03",
@@ -297,7 +332,7 @@
           "capability": "stimulate_measure",
           "actions": [],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_48",
@@ -345,7 +380,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_37",
@@ -367,7 +402,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_37",
@@ -403,7 +438,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_34",
@@ -425,7 +460,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_34",
@@ -461,7 +496,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_48",
@@ -483,7 +518,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_48",
@@ -519,7 +554,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_50",
@@ -541,7 +576,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_50",
@@ -577,7 +612,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_49",
@@ -599,7 +634,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_49",
@@ -635,7 +670,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_14",
@@ -657,7 +692,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_14",
@@ -701,7 +736,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_63",
@@ -723,7 +758,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_63",
@@ -767,7 +802,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_56",
@@ -789,7 +824,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_56",
@@ -833,7 +868,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_14",
@@ -855,18 +890,17 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_14",
               "nominal": 8.5,
-              "tolerance": null,
-              "unit": "V"
+              "tolerance": 0.2,
+              "unit": "V",
+              "basis": "BT-03/BT-05: ±0,2 V như nhánh đối xứng, người dùng chỉ định tạm 2026-11-18"
             }
           ],
-          "issues": [
-            "Thiếu dung sai nhánh +8,5 V."
-          ]
+          "issues": []
         }
       ]
     },
@@ -893,7 +927,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_26",
@@ -929,7 +963,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_25",
@@ -965,7 +999,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_26",
@@ -987,7 +1021,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_26",
@@ -1010,9 +1044,7 @@
       "independence": "mock_only",
       "preparation": "power_all",
       "cleanup": "safe_state",
-      "issues": [
-        "Tài liệu ghi đầu ra 26XP1 cho kênh II; cần xác minh."
-      ],
+      "issues": [],
       "steps": [
         {
           "id": "S01",
@@ -1025,7 +1057,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_26",
@@ -1047,7 +1079,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_26",
@@ -1058,6 +1090,9 @@
           ],
           "issues": []
         }
+      ],
+      "notes": [
+        "BT-04: giữ đo 26XP1 đúng tài liệu (người dùng 2026-11-18); còn nghi vấn vì P14 dùng 25XP1."
       ]
     },
     {
@@ -1083,7 +1118,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_51",
@@ -1105,18 +1140,17 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_51",
               "nominal": 9,
-              "tolerance": null,
-              "unit": "V"
+              "tolerance": 0.2,
+              "unit": "V",
+              "basis": "BT-03/BT-05: ±0,2 V như nhánh đối xứng, người dùng chỉ định tạm 2026-11-18"
             }
           ],
-          "issues": [
-            "Thiếu dung sai nhánh +9 V."
-          ]
+          "issues": []
         }
       ]
     },
@@ -1143,7 +1177,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_52",
@@ -1165,7 +1199,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_52",
@@ -1176,6 +1210,9 @@
           ],
           "issues": []
         }
+      ],
+      "notes": [
+        "BT-06: giữ −0,3 V đúng tài liệu (P17 dùng ±0,4 V)."
       ]
     },
     {
@@ -1201,7 +1238,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_29",
@@ -1223,7 +1260,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_29",
@@ -1245,7 +1282,7 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_29",
@@ -1281,18 +1318,18 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_50",
-              "nominal": null,
+              "nominal": 8.5,
               "tolerance": 0.2,
-              "unit": "V"
+              "unit": "V",
+              "absolute": true,
+              "basis": "BT-08: kiểm |U| = 8,5 ± 0,2 V, chấp nhận cả hai dấu (người dùng chỉ định tạm 2026-11-18)"
             }
           ],
-          "issues": [
-            "Giá trị ± cần xác minh từng cực tính và điều kiện kích thích."
-          ]
+          "issues": []
         }
       ]
     },
@@ -1310,28 +1347,53 @@
       "steps": [
         {
           "id": "S01",
-          "title": "Lệnh ОТКЛ ΩII: mức 0 tại 23XP1 (không CX4)",
+          "title": "ОТКЛ ΩII: mức 0 tại 23XP1 (không CX4); +3 V vào 54XP1",
           "capability": "stimulate_measure",
           "actions": [
             {
               "signal": "set_23",
               "value": 0
+            },
+            {
+              "signal": "set_54",
+              "value": 3
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_49",
-              "nominal": null,
+              "nominal": 8.5,
               "tolerance": 0.2,
-              "unit": "V"
+              "unit": "V",
+              "basis": "BT-09, người dùng chỉ định tạm 2026-11-18"
             }
           ],
-          "issues": [
-            "Giá trị ± cần xác minh từng cực tính và điều kiện kích thích.",
-            "Kích thích ±3 V tại 54XP1 cần xác định tương ứng từng nhánh."
-          ]
+          "issues": []
+        },
+        {
+          "id": "S02",
+          "title": "Giữ ОТКЛ ΩII; −3 V vào 54XP1",
+          "capability": "stimulate_measure",
+          "actions": [
+            {
+              "signal": "set_54",
+              "value": -3
+            }
+          ],
+          "wait_ms": 250,
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
+          "checks": [
+            {
+              "signal": "xp1_49",
+              "nominal": -8.5,
+              "tolerance": 0.2,
+              "unit": "V",
+              "basis": "BT-09, người dùng chỉ định tạm 2026-11-18"
+            }
+          ],
+          "issues": []
         }
       ]
     },
@@ -1358,24 +1420,24 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_50",
-              "nominal": null,
+              "nominal": 8.5,
               "tolerance": 0.2,
-              "unit": "V"
+              "unit": "V",
+              "basis": "BT-10: dấu tạm, người dùng chỉ định tạm 2026-11-18"
             },
             {
               "signal": "xp1_49",
-              "nominal": null,
+              "nominal": -8.5,
               "tolerance": 0.2,
-              "unit": "V"
+              "unit": "V",
+              "basis": "BT-10: dấu tạm, người dùng chỉ định tạm 2026-11-18"
             }
           ],
-          "issues": [
-            "Giá trị ± cần xác minh từng cực tính và điều kiện kích thích."
-          ]
+          "issues": []
         }
       ]
     },
@@ -1402,20 +1464,21 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_50",
-              "nominal": null,
+              "nominal": 8,
               "tolerance": 0.2,
-              "unit": "V"
+              "unit": "V",
+              "basis": "BT-11: đúng nguyên văn (cả P23/P24 cấp 5 V vào 13XP1), dấu tạm, người dùng chỉ định tạm 2026-11-18"
             }
           ],
-          "issues": [
-            "Giá trị ± cần xác minh từng cực tính và điều kiện kích thích.",
-            "Điều kiện có/không CX3 nhưng cùng ghi 5 V tại 13XP1."
-          ]
+          "issues": []
         }
+      ],
+      "notes": [
+        "BT-11: P23 ghi \"không có CX3\" nhưng vẫn cấp 5 V vào 13XP1; giữ nguyên văn theo người dùng, còn nghi vấn."
       ]
     },
     {
@@ -1441,20 +1504,21 @@
             }
           ],
           "wait_ms": 250,
-          "timing_basis": "Thời gian demo; chưa xác minh phần cứng",
+          "timing_basis": "250 ms mỗi bước (BT-12, người dùng chọn 2026-11-18); chưa xác minh phần cứng",
           "checks": [
             {
               "signal": "xp1_49",
-              "nominal": null,
+              "nominal": -8,
               "tolerance": 0.2,
-              "unit": "V"
+              "unit": "V",
+              "basis": "BT-11: đúng nguyên văn (cả P23/P24 cấp 5 V vào 13XP1), dấu tạm, người dùng chỉ định tạm 2026-11-18"
             }
           ],
-          "issues": [
-            "Giá trị ± cần xác minh từng cực tính và điều kiện kích thích.",
-            "Điều kiện có/không CX3 nhưng cùng ghi 5 V tại 13XP1."
-          ]
+          "issues": []
         }
+      ],
+      "notes": [
+        "BT-11: P23 ghi \"không có CX3\" nhưng vẫn cấp 5 V vào 13XP1; giữ nguyên văn theo người dùng, còn nghi vấn."
       ]
     }
   ],
@@ -1468,10 +1532,10 @@
       "actions": []
     },
     "power_all": {
-      "basis": "GIẢ ĐỊNH, chưa xác minh: khối được cấp đủ AC ~36 V/1000 Hz và DC +27/±15/±12/±5 V (tham số 1–2) trước khi kích thích. Thứ tự và thời gian ổn định nguồn chưa có trong tài liệu.",
+      "basis": "GIẢ ĐỊNH: khối được cấp AC ~22 V/1000 Hz (chế độ làm việc sau khởi động, P01) và DC +27, ±15, ±12, ±5 V (mỗi cực một rơ-le) trước khi kích thích. Cấp đồng thời (AT-01).",
       "actions": [
         {
-          "signal": "ac_36v",
+          "signal": "ac_22v",
           "value": 1
         },
         {
@@ -1479,24 +1543,36 @@
           "value": 1
         },
         {
-          "signal": "dc_15v",
+          "signal": "dc_15v_pos",
           "value": 1
         },
         {
-          "signal": "dc_12v",
+          "signal": "dc_15v_neg",
           "value": 1
         },
         {
-          "signal": "dc_5v",
+          "signal": "dc_12v_pos",
+          "value": 1
+        },
+        {
+          "signal": "dc_12v_neg",
+          "value": 1
+        },
+        {
+          "signal": "dc_5v_pos",
+          "value": 1
+        },
+        {
+          "signal": "dc_5v_neg",
           "value": 1
         }
       ]
     },
     "power_all_section_v": {
-      "basis": "GIẢ ĐỊNH như power_all, cộng điều kiện chung mục V (docs/BAI_KIEM_TRA_1101K.md): 27V-KOM vào 4XP1, mức 0 vào 40/41/42XP1.",
+      "basis": "Như power_all, cộng điều kiện chung mục V áp lại cho từng bài (BT-07): 27V-KOM vào 4XP1, mức 0 (nối đất) vào 40/41/42XP1.",
       "actions": [
         {
-          "signal": "ac_36v",
+          "signal": "ac_22v",
           "value": 1
         },
         {
@@ -1504,15 +1580,27 @@
           "value": 1
         },
         {
-          "signal": "dc_15v",
+          "signal": "dc_15v_pos",
           "value": 1
         },
         {
-          "signal": "dc_12v",
+          "signal": "dc_15v_neg",
           "value": 1
         },
         {
-          "signal": "dc_5v",
+          "signal": "dc_12v_pos",
+          "value": 1
+        },
+        {
+          "signal": "dc_12v_neg",
+          "value": 1
+        },
+        {
+          "signal": "dc_5v_pos",
+          "value": 1
+        },
+        {
+          "signal": "dc_5v_neg",
           "value": 1
         },
         {

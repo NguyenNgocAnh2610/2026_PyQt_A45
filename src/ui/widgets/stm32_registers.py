@@ -16,7 +16,7 @@ class Stm32RegistersDialog(QDialog):
         self.resize(1060, 760)
         layout = QVBoxLayout(self)
         controls = QHBoxLayout()
-        self.simulation = QCheckBox('Giả lập STM32 (không gửi COM)')
+        self.simulation = QCheckBox('Giả lập STM32 (COM ảo, không mở COM thật)')
         self.simulation.setChecked(True)
         self.slave = QSpinBox()
         self.slave.setRange(1, 247)
@@ -68,6 +68,11 @@ class Stm32RegistersDialog(QDialog):
         self.bytes_label.setWordWrap(True)
         self.bytes_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.bytes_label)
+        self.frames_label = QLabel()
+        self.frames_label.setWordWrap(True)
+        self.frames_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.frames_label.setToolTip('Khung dựng lại từ PDU, CRC16 tính lại; dùng để đối chiếu với máy dò Modbus.')
+        layout.addWidget(self.frames_label)
         close = QPushButton('Đóng')
         close.clicked.connect(self.close)
         layout.addWidget(close)
@@ -134,6 +139,11 @@ class Stm32RegistersDialog(QDialog):
         ack = state.last_ack
         receipt = '' if ack is None else f" ACK: địa chỉ {ack['address']}, giá trị {ack['values']}."
         self.status.setText(f'{source} · DI {validity}. {state.message}{receipt}')
+        frames = state.frames.get(self.simulation.isChecked(), {})
+        port = 'COM ảo' if self.simulation.isChecked() else 'COM thật'
+        lines = [f"{d} {frames[d].hex(' ').upper()}" for d in ('TX', 'RX') if d in frames]
+        self.frames_label.setText(f'Khung RTU gần nhất ({port}):\n' + '\n'.join(lines) if lines
+                                  else f'Chưa có khung RTU ({port}).')
         self.tx.blockSignals(True)
         for row in range(self.tx.rowCount()):
             if row in state.staged:
