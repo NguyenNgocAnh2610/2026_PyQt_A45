@@ -41,10 +41,22 @@ python .claude/skills/multi-agent-orchestrator/scripts/orchestrate.py run \
 
 python .claude/skills/multi-agent-orchestrator/scripts/orchestrate.py run \
   --agent codex --tier balanced --task-file .agent-orchestrator/tasks/T-002.md \
-  --estimate-tokens 30000
+  --estimate-tokens 30000 \
+  --allow-command "conda run -n qt_env python -B -m unittest tests.test_stm32_bench"
+
+# Phân tích/review khi worktree đang có thay đổi chưa commit; đọc thêm thư mục ngoài repo:
+python .claude/skills/multi-agent-orchestrator/scripts/orchestrate.py run \
+  --agent antigravity --tier fast --read-only --task-file .agent-orchestrator/tasks/T-003.md \
+  --estimate-tokens 25000 --read-dir "D:/duong/dan/firmware"
 ```
 
-Lệnh nhận task content (không nội suy shell), chỉ gọi binary cấu hình; logs cục bộ tại `.agent-orchestrator/runtime/` (gitignored). Sau chạy, đọc report và kiểm tra `status`: **exit 0 không đồng nghĩa với thành công của task**. Có thể chạy tuần tự trên workspace sạch. Nếu cần đồng thời, tạo **Git worktree/branch riêng** cho mỗi worker bằng quy trình trong `references/worktrees.md`; không để hai worker sửa cùng working tree. Không tự merge/push.
+Quyền của worker khi chạy nền (đã kiểm thực tế 2026-11-19, `agy` 1.5.11, `codex-cli` 0.169.0, Windows):
+- **Lệnh shell chỉ chạy khi được liệt kê bằng `--allow-command`, đúng nguyên văn từng ký tự** (một lệnh mỗi lần, không `cd`/`&&`/`;`). Antigravity chạy nền không hỏi được người dùng: lệnh không khớp quy tắc bị từ chối âm thầm; trên Windows (PowerShell) quy tắc phải khớp chính xác, không dùng tiền tố. Script tự tạo file `--settings` riêng cho lần chạy (`command(...)`, `read_file(...)`) và bật `--sandbox`. Tài khoản hiện tại không có `--mode auto`. **Không dùng `--dangerously-skip-permissions`.**
+- `--read-dir`: thư mục ngoài repo chỉ đọc. Không dùng `--add-dir` của `agy`: nó đổi thư mục làm việc của lệnh khỏi gốc dự án (test chạy sai chỗ, ra `Ran 1 test … FAILED`).
+- `--read-only`: không cần worktree sạch; Antigravity chạy chế độ mặc định (mọi thao tác ghi bị từ chối), Codex dùng sandbox `read-only` (nếu có `--allow-command` thì `workspace-write`, vì test/`conda run` cần file tạm). Sau khi chạy, script so `git status`; có thay đổi thì báo lỗi.
+- Không `--read-only` thì vẫn yêu cầu worktree sạch (hoặc dùng git worktree riêng).
+
+Lệnh nhận task content (không nội suy shell), chỉ gọi binary cấu hình; logs cục bộ tại `.agent-orchestrator/runtime/` (gitignored). Sau chạy, đọc report: `cli_run_ok` chỉ đúng khi exit 0, không timeout, **không có `denied_actions`**, có câu trả lời cuối (`response`) và (khi `--read-only`) worktree không đổi; lý do nằm trong `problems`. **Kể cả vậy cũng không đồng nghĩa task đạt**: Claude phải tự kiểm. Sổ token (`budget`) tự đặt lại mỗi ngày. Thực tế Codex đọc AGENTS.md… nên một việc nhỏ đã tốn 40–150 nghìn token; ước tính cho đúng. Có thể chạy tuần tự trên workspace sạch. Nếu cần đồng thời, tạo **Git worktree/branch riêng** cho mỗi worker bằng quy trình trong `references/worktrees.md`; không để hai worker sửa cùng working tree. Không tự merge/push.
 
 **5. Review & nghiệm thu.** Claude trực tiếp kiểm tra diff, giới hạn thay đổi, lỗi tiềm ẩn, test và độ tương thích. Worker response chỉ là tuyên bố, không phải bằng chứng. Bắt buộc test theo repo, bảo mật, lint/typecheck nếu có. Nếu worker lỗi/quota/mất quyền hoặc không đủ kết quả: giữ trạng thái chưa hoàn thành, giảm task hoặc chuyển về Claude. Không lặp lại vô hạn; tối đa 1 lượt sửa lại tự động/task trước khi báo cáo. Với rủi ro cao, phải được người dùng duyệt trước khi tác động hệ thống thật, secrets, dữ liệu thật hoặc phần cứng.
 

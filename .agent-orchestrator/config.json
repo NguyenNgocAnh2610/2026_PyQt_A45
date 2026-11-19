@@ -6,7 +6,7 @@
       "models": {
         "fast": "gemini-3.8-flash-medium",
         "balanced": "gemini-3.8-flash-high",
-        "strong": "gemini-3.1-pro-high"
+        "strong": "gemini-4-argon-high"
       },
       "session_soft_budget_tokens": 120000,
       "per_task_estimate_cap_tokens": 30000,

@@ -101,15 +101,12 @@ Bài kiểm tra (giá trị tạm do người dùng chỉ định 2026-11-18, gh
   - `cmd`, `git_daily.ps1`, `git_daily.sh`: tiện ích Git cá nhân, chưa rõ còn dùng không.
   - `captures/*.png`: ảnh đối chiếu preview.
 - `docs/TECHNICAL_REVIEW.md` không còn trên đĩa từ trước; không tự khôi phục.
-- Firmware bo CPU có tại `D:\project\2026_DT_Chinh\Program\CPUv1.0` (đã đối chiếu 2026-11-18). Firmware và sơ đồ
-  các bo con chưa có.
-- Đợt 2026-11-18 (áp dụng phiếu) Claude làm trực tiếp, không gọi worker: Codex hết hạn mức tới 2026-11-19 11:01,
-  Antigravity headless không chạy được lệnh.
+- Firmware bo CPU đã đối chiếu ngày 2026-11-18 tại `D:\project\2026_DT_Chinh\Program\CPUv1.0`; **ngày 2026-11-19 thư mục
+  này không còn trên máy** (có thể đã chuyển). Firmware và sơ đồ các bo con chưa có.
 - `tests/preview_main.py`: thêm `--state manual` (chụp hộp thoại nhập tay); các trạng thái khác tự bỏ trống nhập tay.
-- Worker của orchestrator không dùng được cho việc đọc firmware:
-  - Codex báo hết hạn mức tới 2026-11-19 11:01.
-  - Antigravity ở chế độ headless bị từ chối lệnh shell và đọc file ngoài repo.
-  - Worktree tạm `../GUI-wt-fwreview` (detached, chỉ có file task) có thể xóa bằng `git worktree remove`.
+- Orchestrator: ngân sách mềm trong `.agent-orchestrator/config.json` (Codex 160k, Antigravity 120k/ngày, trần 30k/60k mỗi
+  việc) nhỏ so với mức dùng thật (Codex 40–150k token cho một việc nhỏ). Người dùng quyết định có nâng không.
+- Worktree tạm `../GUI-wt-fwreview` (detached, chỉ có file task) có thể xóa bằng `git worktree remove`.
 - `tests/preview_main.py --scenario` vẫn liệt kê `stale`/`protection`; với adapter stm32 backend sẽ từ chối.
 - Khi đang tạm dừng, màn hình chẩn đoán hai mảng vẫn bị khóa (backend coi là đang bận).
 - Nút "Tạm dừng" của đồ thị demo trùng tên với nút Tạm dừng quy trình; cân nhắc đổi tên.
@@ -154,6 +151,16 @@ Bài kiểm tra (giá trị tạm do người dùng chỉ định 2026-11-18, gh
   **120/120**; preview màn hình chính đã xem. Chưa thử trên mạch thật.
 
 ## Lịch sử ngắn
+- 2026-11-19: sửa skill `multi-agent-orchestrator` (trước đây chưa giao việc được lần nào). Đã thử thật Antigravity (`agy` 1.5.11)
+  và Codex (`codex-cli` 0.169.0): đọc repo, chạy `tests.test_virtual_port` (15 OK), đọc thư mục ngoài repo, ghi file.
+  - Lỗi gốc: `agy -p --mode accept-edits` chỉ duyệt sửa file, mọi lệnh shell bị từ chối âm thầm; tài khoản không có
+    `--mode auto`. Sửa: `--sandbox` + file `--settings` riêng mỗi lần chạy với quy tắc `command(<lệnh đúng nguyên văn>)`
+    (Windows bắt khớp chính xác) và `read_file(<thư mục>)`; không dùng `--add-dir` (đổi thư mục làm việc → test chạy sai chỗ).
+  - Script trước coi `status: SUCCESS` là đạt dù có `denied_actions` và câu trả lời rỗng; nay kiểm cả hai, đọc lỗi/tin nhắn
+    cuối của Codex, ghi `problems`/`response` vào report.
+  - Codex: đóng stdin (tránh treo); `--read-only` (không cần worktree sạch, so `git status` sau khi chạy);
+    `--allow-command`, `--read-dir`; sổ token đặt lại mỗi ngày; model `strong` của Antigravity đổi thành `gemini-4-argon-high`
+    (`gemini-3.1-pro-high` không có trong `agy models`).
 - 2026-11-18: sửa lỗi người dùng báo: nhập tay tần số ở P01 (có nhập hay bỏ trống) đều ra ERROR "Mẫu thiếu, lỗi hoặc hết
   hạn". Nguyên nhân: số đo tự động của cùng bước (áp 3 pha, dòng) đọc trước khi hộp thoại hiện, quá `stale_ms` (1 s) khi
   người vận hành trả lời. Sửa: giữ nguyên các số đo đó lúc mở hộp thoại và đánh giá theo thời điểm đọc (`_manual_frozen`).
