@@ -128,8 +128,9 @@ vào phiên; không đổi timeout giao dịch.
 
 | Trường | Ý nghĩa |
 |---|---|
-| `adapter` | `stm32`: bộ chạy bài ghi/đọc hai mảng STM32 CPUv1.0. `mock`: khung A45 v1 cũ |
-| `production_ready` | Bắt buộc `false` (chưa có đường chạy mạch thật) |
+| `adapter` | `stm32`: bộ chạy bài ghi/đọc hai mảng STM32. `mock`: khung A45 v1 cũ |
+| `cpu_map` | Bản đồ thanh ghi của firmware CPU: `CPUv1.0` (mặc định) hoặc `CPUv1.1` (A45, có `Matrix0/1` ở index 18–19, `CDT` ở 20, DI 1–42). Danh sách trong `src/common/stm32.py` → `CPU_MAPS` |
+| `production_ready` | Bắt buộc `false`: profile chưa được phê duyệt toàn bộ. Chạy bài trên mạch thật mở **từng bài** khi mọi ánh xạ bài dùng là `verified` (xem `stm32_io` → `status`) |
 | `capabilities` | Loại thao tác bước được dùng |
 | `serial` | Gợi ý cổng/baud/parity/stop/slave cho chẩn đoán |
 | `stm32_io` | Ánh xạ tín hiệu ↔ thanh ghi (adapter `stm32`) |
@@ -140,23 +141,24 @@ vào phiên; không đổi timeout giao dịch.
 
 ```json
 "stm32_io": {
-  "slave": 9, "mux_register": "MUX", "mux_settle_ms": 20, "di_update_ms": 150, "break_ms": 150,
-  "mux_layout": {"banks": 2, "bank_bits": 8, "idle_channel": 31},
-  "extra_write_registers": {"SW03": 29, "SW04": 30},
+  "slave": 11, "mux_register": "MUX", "mux_settle_ms": 20, "di_update_ms": 150, "break_ms": 150,
+  "mux_layout": {"banks": 2, "bank_bits": 8, "channels": 32, "idle_channel": 31},
+  "extra_write_registers": {"Matrix2_0": 31, "Matrix2_1": 32},
   "session":    {"Mode": 1, "Plan": 2},
-  "safe_state": {"DAC_val": 0, "DOUT": 0, "SW01": 0, "SW02": 0, "MUX": 7967, "Power": 0, "SW03": 0, "SW04": 0},
-  "hmi_forced_bits": {"Power": [7, 8, 9], "SW01": [12, 14], "SW02": [0, 12]},
+  "safe_state": {"DAC_val": 0, "DOUT": 0, "MUX": 7967, "Power": 0, "Matrix0": 0, "Matrix1": 0,
+                 "Matrix2_0": 0, "Matrix2_1": 0},
+  "hmi_forced_bits": {"Power": [7, 8, 9]},
   "interlocks": [["ac_36v", "ac_22v"]],
   "dac": {"register": "DAC_val", "scale": -0.00155, "offset": 0, "min": -1.5, "max": 1.5,
           "count_min": -1000, "count_max": 1000, "status": "assumed"},
   "sources": {"P3V": {"value": 3}, "GND": {"value": 0}, "DAC": {"dac": true}, "PULSE": {"value": 4.5}},
   "matrix_boards": [
-    {"id": 1, "registers": ["SW01", "SW02"], "size": {"inputs": 8, "outputs": 4}, "layout": "out*8+in",
-     "status": "assumed", "inputs": {"2": "P3V", "4": "DAC", "6": "GND"}, "outputs": {"1": "set_40"}}
+    {"id": 6, "registers": ["Matrix0", "Matrix1"], "size": {"inputs": 8, "outputs": 4}, "layout": "out*8+in",
+     "status": "assumed", "inputs": {"1": "P3V", "3": "DAC", "4": "GND"}, "outputs": {"1": "set_40"}}
   ],
   "outputs": {
     "ac_36v": {"kind": "bit", "register": "Power", "bit": 0, "on_value": 1, "off_value": 0, "status": "assumed"},
-    "set_4":  {"kind": "bit", "register": "DOUT", "bit": 0, "on_value": 27, "status": "assumed"}
+    "dc_27v": {"kind": "bit", "register": "Power", "bit": 2, "on_value": 1, "off_value": 0, "status": "assumed"}
   },
   "inputs": {
     "xp1_50":    {"kind": "adc", "register": "ADC3_val", "signed": true, "scale": 0.01, "offset": 0,
@@ -174,11 +176,11 @@ vào phiên; không đổi timeout giao dịch.
 | `session` | Ghi đầu mỗi bài; bắt buộc `"Mode": 1` |
 | `safe_state` | Giá trị an toàn cho **mọi** thanh ghi mà output dùng. `MUX` phải bằng word "mọi bank ở `idle_channel`" |
 | `mux_register`, `mux_settle_ms` | Thanh ghi chọn kênh đo; thời gian ổn định analog sau khi đổi kênh |
-| `mux_layout` | Tùy chọn, mặc định 1 bank 16 bit, idle 0. Word MUX = OR các bank, mỗi bank `bank_bits` bit chứa **số kênh**; bank không đo giữ `idle_channel` (kênh hở hết) |
+| `mux_layout` | Tùy chọn, mặc định 1 bank 16 bit, idle 0. Word MUX = OR các bank, mỗi bank `bank_bits` bit chứa **số kênh**; bank không đo giữ `idle_channel` (kênh hở hết). `channels` = số kênh hợp lệ mỗi bank (RLMUX: 32); mọi ghi MUX có kênh ≥ `channels` bị chặn vì firmware bo MUX không kiểm giới hạn |
 | `di_update_ms` | Tùy chọn, mặc định 0. Thời gian để lệnh đã ACK lên tới DI: vòng lặp MCU chuyển lệnh xuống bo con, đọc ADC, chép DI. Số đo chỉ được đọc khi đã qua `di_update_ms + mux_settle_ms` kể từ ACK ghi cuối. Đặt ≥ 2 × chu kỳ vòng lặp MCU đo được (bài tự kiểm tra D02) |
 | `break_ms` | Tùy chọn, mặc định = `di_update_ms`. Ngắt trước đóng sau: khi một bước vừa nhả vừa đóng rơ-le, ghi phần nhả, chờ `break_ms` kể từ ACK, rồi mới ghi phần đóng |
-| `extra_write_registers` | Tùy chọn. Thanh ghi DO **đề xuất sửa firmware** (tên mới, index 29–31). Chỉ bộ chạy bài và COM ảo dùng; ghi rõ "cần sửa FW" trong `unresolved` |
-| Tên thanh ghi | Theo `WriteRegister`/`ReadRegister` (`src/common/stm32.py`) hoặc `extra_write_registers`. Chỉ được ghi `BENCH_WRITABLE` + thanh ghi mở rộng, không DataO1/DataO2/DataO3/CDT/DataT/Null |
+| `extra_write_registers` | Tùy chọn. Thanh ghi DO **đề xuất sửa firmware** (tên mới, index từ cuối bản đồ tới cuối mảng firmware: CPUv1.0 29–31, CPUv1.1 31–49). Bộ chạy bài, công cụ Test Modbus và COM ảo dùng; ghi rõ "cần sửa FW" trong `unresolved` |
+| Tên thanh ghi | Theo bản đồ `cpu_map` hoặc `extra_write_registers`. Chỉ được ghi `bench_writable` của bản đồ + thanh ghi mở rộng, không DataO1/DataO2/DataO3/CDT/DataT/Null |
 | `hmi_forced_bits` | Bit firmware tự bật khi `Mode ≠ 1`/reset; validator cấm mọi output dùng các bit này |
 | `interlocks` | Tùy chọn. Nhóm output không được bật cùng lúc; ảnh DO vi phạm → lỗi khi nạp/khi chạy |
 | `dac` | Tùy chọn. Mã = round((giá trị − offset) / scale) vào `DAC_val`. Ngoài `min/max` hoặc `count_min/count_max` → lỗi, không kẹp. Hai chân cần hai mức khác nhau cùng lúc → lỗi |
@@ -190,7 +192,7 @@ vào phiên; không đổi timeout giao dịch.
 | Input `link` | = 1 khi FC03 hợp lệ |
 | Input `manual` | Người vận hành nhập (`prompt`); không đọc qua FC03 |
 | Input `loop_probe` | Tự kiểm tra chu kỳ vòng lặp CPU: đọc FC03 mỗi `poll_ms` trong `duration_ms` |
-| `status` | `assumed` (chưa đo kiểm) / `verified` (**chỉ sau khi đo kiểm thật**) / `unsupported` + `reason` (bài dùng tín hiệu này → BLOCKED) |
+| `status` | `assumed` (chưa đo kiểm) / `verified` (**chỉ sau khi đo kiểm thật**) / `unsupported` + `reason` (bài dùng tín hiệu này → BLOCKED). Áp cho output, input, từng bo matrix và khối `dac`. Trên mạch thật, bài chỉ chạy khi mọi mục nó dùng là `verified` |
 | `note`, `*_note` | Ghi chú tự do |
 
 Mọi tín hiệu dùng trong `actions`, `checks` và `sequences` phải có mục trong
@@ -230,10 +232,11 @@ của từng check, điểm còn nghi vấn ở `notes` của bài. Không còn 
 
 Chạy tự động mô phỏng: **24/24 PASS** (bỏ trống tần số thì ghi "có giá trị mặc định
 chưa đo"). PASS mô phỏng không có nghĩa bài sẵn sàng chạy phần cứng: ánh xạ
-`stm32_io` (bảng phân bổ để đi dây, `docs/STM32_MODBUS_PC.md` mục 9.10) và trình tự
-`sequences` vẫn là giả định; bo matrix 2 cần sửa firmware CPU. Tự kiểm tra: D01
-truyền thông (ghi có ACK + FC03), D02 chu kỳ vòng lặp CPU, D03 chưa định nghĩa
-(BLOCKED).
+`stm32_io` (CPUv1.1 slave 11, 4 bo matrix, bảng phân bổ để đi dây ở
+`docs/STM32_MODBUS_PC.md` mục 9.10) và trình tự `sequences` vẫn là giả định; bo matrix
+ID 7–9 cần sửa firmware CPU và bo con. Tự kiểm tra: D01 truyền thông (ghi có ACK +
+FC03), D02 chu kỳ vòng lặp CPU, D03 chưa định nghĩa (BLOCKED). Trên COM thật: tự kiểm
+tra chạy được; bài đo bị chặn cho tới khi các mục nó dùng được đổi `verified`.
 
 Cấu hình thứ hai `alternative_profile` (`tests/test_bench.py`, trạm nhiệt demo,
 adapter `mock`) kiểm tra rằng UI và bộ chạy bài không phụ thuộc tên A45.

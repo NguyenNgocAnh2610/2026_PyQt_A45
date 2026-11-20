@@ -1,4 +1,5 @@
 """Single source of truth and asynchronous, profile-driven test runner."""
+from collections import deque
 from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -11,10 +12,12 @@ from pathlib import Path
 
 from src.common.models import SignalModel
 from src.common.monitor import DEFAULT_MONITOR_CHANNELS, demo_monitor_samples
-from src.common.profiles import load_profile, specification_issues, stm32_unsupported, validate_profile
-from src.common.testing import Mode, Sample, POLL_MS, OPERATION_TIMEOUT_MS, SCENARIOS, STM32_SCENARIOS
+from src.common.profiles import (load_profile, specification_issues, stm32_unsupported, stm32_unverified,
+                                 validate_profile)
+from src.common.testing import (Mode, Sample, POLL_MS, OPERATION_TIMEOUT_MS, SCENARIOS, STM32_SCENARIOS,
+                                READY_SIMULATION, READY_REAL, READY_STATES)
 from src.common.serial import SerialSettings
-from src.common.stm32 import Stm32RegisterBanks, DEFAULT_SLAVE, READ_COUNT, READ_STALE_MS
+from src.common.stm32 import Stm32RegisterBanks, DEFAULT_SLAVE, READ_STALE_MS
 from src.protocol import stm32_write_words, decode_stm32, register_words
 from src.device import Device
 from src.storage import SessionStore
@@ -50,6 +53,8 @@ class Backend(QObject):
     stm32_changed = Signal()
     # Emitted when manual_request appears or disappears (operator entry).
     manual_input_changed = Signal()
+    # Test Modbus tool state (queue, known DO image, message, log).
+    tool_changed = Signal()
 
     def __init__(self, profile=None, username="demo", storage_dir=None, parent=None):
         super().__init__(parent)
@@ -81,12 +86,24 @@ class Backend(QObject):
         self.controller_info = None
         self.controller_result = None
         self.serial_read_pending = False
-        self.stm32 = Stm32RegisterBanks()
+        self.cpu_map = self.device.cpu_map
+        self.stm32 = Stm32RegisterBanks(self.cpu_map)
+        # Rolling RTU frame log for the Test Modbus page (both ports).
+        self.frame_log = deque(maxlen=500)
+        profile_slave = self.device.io_map.slave if self.device.io_map else DEFAULT_SLAVE
+        self.tool = {'image': None, 'queue': [], 'inflight': False, 'simulation': True, 'slave': profile_slave,
+                     'message': 'Chưa lấy quyền điều khiển.', 'log': deque(maxlen=200)}
         self.stm32_pending = False
+        # A periodic read issued by an auto-read box: the UI keeps its controls
+        # enabled and tool commands wait for it instead of being refused.
+        self.stm32_background = False
         self.device.stm32_completed.connect(self._stm32_completed)
         # 'stm32': runner writes/reads the two CPUv1.0 banks; 'mock': legacy A45 v1.
         self.adapter = self.profile.hardware["adapter"]
         self.bench_token = None
+        # Last CPU loop-period self-test (D02) on the CURRENT real connection;
+        # tests on real hardware need it to fit the runner's DI wait.
+        self.loop_check = None
         # Pending operator entry (e.g. frequency read on an oscilloscope).
         self.manual_request = None
         self._manual_frozen = (0.0, {})  # (capture time, bench samples) of the waiting step.
@@ -184,8 +201,52 @@ class Backend(QObject):
         return STM32_SCENARIOS if self.adapter == "stm32" else SCENARIOS
 
     @property
+    def real_hardware(self):
+        """The runner talks to the real CPU (verified real COM connection)."""
+        return self.connection == READY_REAL or (self.session is not None and not self.session.get("simulation", True)
+                                                 and self.busy)
+
+    @property
+    def run_simulation(self):
+        return self.connection_adapter == 'mock'
+
+    @property
+    def effective_time_scale(self):
+        # Waits are never shortened on real hardware (AGENTS.md).
+        return self.time_scale if self.run_simulation else 1.0
+
+    def real_run_blockers(self, tests=None):
+        """Why the selected tests may not run on the real bench (empty = allowed).
+
+        Self-tests only write the safe state and are always allowed. Other
+        tests need every mapping they use 'verified' on the bench, and a CPU
+        loop period (self-test D02, this connection) within the DI wait.
+        """
+        if self.mode == Mode.SELF:
+            return []
+        tests = tests if tests is not None else self._selected_tests()
+        blockers = []
+        io = self.device.io_map
+        limit = io.di_update_ms / 2 if io else 0
+        check = self.loop_check
+        if not check or check.get("status") != "PASS":
+            blockers.append("Chưa chạy tự kiểm tra D02 (chu kỳ vòng lặp CPU) đạt trên kết nối thật này.")
+        elif check["value"] > limit:
+            blockers.append(f"Chu kỳ CPU đo được {check['value']:g} ms > di_update_ms/2 = {limit:g} ms.")
+        for test in tests:
+            pending = stm32_unverified(self.profile, test)
+            if pending:
+                blockers.append(f"{test['id']}: ánh xạ chưa đo kiểm ({', '.join(pending[:6])}"
+                                + (f" … +{len(pending) - 6}" if len(pending) > 6 else "") + ")")
+        return blockers
+
+    def _selected_tests(self):
+        return [t for t in self.tests if self.mode != Mode.MANUAL or t["id"] == self.selected_id]
+
+    @property
     def can_start(self):
-        if self.busy or self.closed or self.shutdown_requested or self.connection != "Sẵn sàng · MÔ PHỎNG":
+        if (self.busy or self.closed or self.shutdown_requested or self.connection not in READY_STATES
+                or self.tool_busy):
             return False
         if self.adapter == "stm32":
             # Readiness = the slave answered FC03 on connect; each test starts
@@ -280,7 +341,9 @@ class Backend(QObject):
         self.serial_detail = detail
         self.serial_result = None
         self.serial_read_pending = False
+        self.stm32_background = False
         if state != 'open':
+            self._tool_drop_deferred('COM đã đóng')
             if self.stm32.source and not self.stm32.source[0]:
                 self.stm32.invalidate()
                 self.stm32.message = detail or 'COM đã đóng; dữ liệu STM32 không còn hiệu lực.'
@@ -291,14 +354,29 @@ class Backend(QObject):
             self.uart_last_hex = ''
         if self.connection_adapter == 'mock':
             return
+        if state != 'open':
+            self.loop_check = None
         if state == 'open':
             self.connection = f'Đã mở {self.serial_settings.port}'
             self.serial_detail = (f'{self.serial_settings.baudrate} baud · {self.serial_settings.framing}. '
                                   'Cổng đã mở; chưa xác minh phản hồi thiết bị.')
+            if (self.adapter == "stm32" and self.connection_adapter == 'rtu' and not self.stm32_pending
+                    and self.bench_token is None and not self.busy):
+                # FC03 only (writes nothing): proves the CPU slave answers.
+                self.connection = "Đang xác minh STM32 thật"
+                self.serial_detail += f" Đang đọc FC03 tới slave {self.device.io_map.slave}…"
+                self.bench_token = str(uuid.uuid4())
+                try:
+                    self.device.bench_connect(self.bench_token, simulation=False)
+                except ValueError as error:
+                    self.bench_token = None
+                    self.connection = f'Đã mở {self.serial_settings.port}'
+                    self.serial_detail = str(error)
         elif state == 'connecting':
             self.connection = 'Đang mở COM…'
         elif state == 'error':
-            self.connection = 'Lỗi kết nối COM'
+            if not self.connection.startswith('Không có phản hồi STM32'):
+                self.connection = 'Lỗi kết nối COM'  # Keep the more specific verify failure.
             self._invalidate()
         else:
             self.connection = 'Chưa kết nối'
@@ -322,13 +400,15 @@ class Backend(QObject):
             self.changed.emit()
 
     def _frame_logged(self, simulation, direction, raw):
+        self.frame_log.append((datetime.now().strftime('%H:%M:%S.%f')[:-3], bool(simulation), direction,
+                               bytes(raw).hex(' ').upper()))
         frames = self.stm32.frames.setdefault(simulation, {})
         if direction == 'TX':
             frames.clear()
         frames[direction] = bytes(raw)
 
     def stage_stm32(self, address, values):
-        words = stm32_write_words(address, values)
+        words = stm32_write_words(address, values, self.cpu_map.write_count)
         self.stm32.mod_buf_to_write[address:address + len(words)] = words
         self.stm32.staged.update(range(address, address + len(words)))
         self.stm32_changed.emit()
@@ -337,33 +417,65 @@ class Backend(QObject):
         self.stm32.staged.discard(address)
         self.stm32_changed.emit()
 
+    def check_cpu_slave(self, slave):
+        """Only the CPU is on the PC's bus: every stm32 request goes to its slave ID.
+
+        Sub-boards (RLPW, RLMatrix, RLMUX…) sit on the CPU's own USART1 bus and
+        are driven by writing the CPU's registers; the PC never addresses them.
+        """
+        io = self.device.io_map
+        if io is not None and slave != io.slave:
+            boards = ', '.join(f'{board} ID {sid}' for _, board, sid, _ in self.cpu_map.forwards)
+            raise ValueError(f'PC chỉ giao tiếp với CPU slave {io.slave} (hardware.json → stm32_io.slave); không gửi tới '
+                             f'slave {slave}. Bo con ({boards}) nằm trên bus riêng của CPU: điều khiển bằng thanh ghi '
+                             f'của CPU.')
+
+    @property
+    def stm32_foreground_busy(self):
+        """Busy for operator actions; a background auto-read does not count."""
+        return (self.busy or self.closed or self.tool_busy
+                or (self.serial_read_pending and not self.stm32_background))
+
     def select_stm32_source(self, simulation, slave):
-        if self.stm32_pending:
-            raise ValueError('Chờ giao dịch STM32 kết thúc trước khi đổi nguồn.')
         source = (bool(simulation), slave)
+        if self.stm32_pending and source != self.stm32.source:
+            raise ValueError('Chờ giao dịch STM32 kết thúc trước khi đổi nguồn.')
         if source != self.stm32.source:
             self.stm32.source = source
             self.stm32.invalidate()
             self.stm32.message = 'Đã đổi nguồn/Slave ID; cần đọc lại.'
             self.stm32_changed.emit()
 
-    def request_stm32(self, *, simulation=True, slave=DEFAULT_SLAVE, address=None, count=1):
-        if self.busy or self.closed or self.shutdown_requested or self.serial_read_pending:
+    def request_stm32(self, *, simulation=True, slave=None, address=None, count=1, background=False):
+        """``slave`` defaults to the profile's CPU slave ID.
+
+        ``background`` marks a periodic auto-read: it leaves the status text
+        alone (no "waiting" flicker) and lets tool commands queue behind it.
+        """
+        slave = self.tool['slave'] if slave is None else slave
+        self.check_cpu_slave(slave)
+        if self.busy or self.closed or self.shutdown_requested or self.serial_read_pending or self.tool_busy:
             raise ValueError('Ứng dụng đang bận hoặc đóng.')
+        if self.bench_token is not None:
+            raise ValueError('Bộ chạy bài đang dùng STM32 (đang xác minh kết nối).')
         if not simulation and (self.serial_state != 'open' or self.connection_adapter != 'rtu'):
             raise ValueError('Mở COM ở chế độ Modbus RTU trước khi giao tiếp STM32 thật.')
         values = None
         if address is not None:
             if type(count) is not int or count < 1:
                 raise ValueError('Số thanh ghi ghi phải lớn hơn 0.')
-            stm32_write_words(address, [0])  # Validate address before slicing.
-            values = stm32_write_words(address, self.stm32.mod_buf_to_write[address:address + count])
+            limit = self.cpu_map.write_count
+            stm32_write_words(address, [0], limit)  # Validate address before slicing.
+            values = stm32_write_words(address, self.stm32.mod_buf_to_write[address:address + count], limit)
             if len(values) != count or not set(range(address, address + count)) <= self.stm32.staged:
                 raise ValueError('Nhập rõ giá trị cho từng thanh ghi trong vùng gửi; không tự gửi các số 0 mặc định.')
+            self.check_safe_write(address, values)
         self.select_stm32_source(simulation, slave)
         self.stm32_pending = self.serial_read_pending = True
+        self.stm32_background = bool(background) and values is None
         self.stm32.last_ack = None if values is not None else self.stm32.last_ack
-        self.stm32.message = 'Đang chờ phản hồi STM32…'
+        if not self.stm32_background:
+            self.stm32.message = 'Đang chờ phản hồi STM32…'
         try:
             if values is None:
                 self.device.read_stm32(slave, simulation)
@@ -375,18 +487,198 @@ class Backend(QObject):
         self.stm32_changed.emit()
         self.changed.emit()
 
+    def check_safe_write(self, address, values):
+        """Refuse writes that the firmware would execute dangerously.
+
+        The RLMUX board indexes Mux_Decoder[32] without a bounds check, so a
+        MUX channel outside the configured range would close random relays.
+        """
+        io = self.device.io_map
+        if io is None or not address <= io.mux < address + len(values):
+            return
+        word = values[io.mux - address]
+        bad = [c for c in io.mux_channels(word) if c >= io.mux_channel_count]
+        if bad:
+            raise ValueError(f'MUX = {word} (0x{word:04X}) chọn kênh {bad[0]} ≥ {io.mux_channel_count}: firmware bo MUX '
+                             'không kiểm giới hạn và sẽ đóng rơ-le ngẫu nhiên. Không gửi.')
+
+    # ---- "Test Modbus" tool: operator-driven control of the boards ----------
+    # Semantic operations go through the SAME Stm32IoMap as the runner
+    # (interlocks, HMI-forced bits, matrix one-source-per-pin, MUX bound,
+    # break-before-make). Writes are queued one transaction at a time, never
+    # retried; any error makes the DO image unknown until "Về an toàn".
+
+    @property
+    def tool_busy(self):
+        return bool(self.tool['queue']) or self.tool['inflight']
+
+    def tool_take_control(self, simulation, slave):
+        """Mode=1/Plan=2 plus the full safe state (everything off)."""
+        self._tool_start(simulation, slave, [('image', None, self._tool_safe_image())],
+                         'Lấy quyền điều khiển: Mode=1, mọi đầu ra về an toàn.')
+
+    def tool_safe_state(self):
+        """Rewrite the whole safe state (works even when the image is unknown)."""
+        self._tool_start(self.tool['simulation'], self.tool['slave'], [('image', None, self._tool_safe_image())],
+                         'Về an toàn: ghi lại toàn bộ trạng thái an toàn.')
+
+    def tool_release_to_hmi(self):
+        """Mode=0: the CPU follows its HMI code again (it turns VDD1–3 on)."""
+        self._tool_start(self.tool['simulation'], self.tool['slave'],
+                         [('write', self.cpu_map.write_index('Mode'), [0])],
+                         'Trả về HMI (Mode=0): CPU tự điều khiển, tự bật VDD1–3; PC không còn giữ trạng thái.')
+        self.tool['image'] = None
+
+    def tool_set(self, actions):
+        """Signal-level actions ({signal, value}) through the runner's map."""
+        io = self._tool_io()
+        new = io.apply(self.tool['image'], actions)
+        self._tool_start(self.tool['simulation'], self.tool['slave'], [('image', self.tool['image'], new)],
+                         'Đặt ' + ', '.join(f"{a['signal']}={a['value']}" for a in actions))
+
+    def tool_set_word(self, name, word):
+        """One register by name (MUX channels, DAC_val, DOUT, raw relay word)."""
+        io = self._tool_io()
+        address = io.address(name)
+        if address not in io.safe_image():
+            raise ValueError(f'{name} không thuộc vùng công cụ được ghi (safe_state).')
+        register_words([word])
+        new = dict(self.tool['image'])
+        new[address] = word
+        self.check_safe_write(address, [word])
+        self._tool_check_interlocks(io, new)
+        self._tool_start(self.tool['simulation'], self.tool['slave'], [('image', self.tool['image'], new)],
+                         f'Ghi {name} = {word} (0x{word:04X})')
+
+    def _tool_io(self):
+        io = self.device.io_map
+        if io is None:
+            raise ValueError('Profile không dùng adapter stm32.')
+        if not self.tool_image_known():
+            raise ValueError('Trạng thái đầu ra chưa biết: bấm "Lấy quyền điều khiển" hoặc "Về an toàn" trước.')
+        return io
+
+    @staticmethod
+    def _tool_check_interlocks(io, image):
+        io.apply(image, [])  # Re-runs interlock checks on a raw image.
+        for sid, entry in io.outputs.items():
+            if entry.get('kind') == 'pin' and io.inverse(image).get(sid, 0) is None:
+                raise ValueError(f'{sid}: hai nguồn cùng nối vào một chân (chập). Không gửi.')
+
+    def _tool_safe_image(self):
+        io = self.device.io_map
+        if io is None:
+            raise ValueError('Profile không dùng adapter stm32.')
+        return io.safe_image()
+
+    def _tool_start(self, simulation, slave, ops, label):
+        self.check_cpu_slave(slave)
+        if self.busy or self.closed or self.shutdown_requested:
+            raise ValueError('Bộ chạy bài đang chạy hoặc ứng dụng đang đóng.')
+        if self.tool_busy or (self.serial_read_pending and not self.stm32_background):
+            raise ValueError('Đang chờ giao dịch trước kết thúc.')
+        if not simulation and (self.serial_state != 'open' or self.connection_adapter != 'rtu'):
+            raise ValueError('Mở COM ở chế độ Modbus RTU trước khi điều khiển mạch thật.')
+        io = self.device.io_map
+        queue = []
+        for op in ops:
+            if op[0] != 'image':
+                queue.append(op)
+                continue
+            old, new = op[1], op[2]
+            for index, image in enumerate(io.phases(old, new)):
+                if index:
+                    queue.append(('wait', io.break_ms))  # Break-before-make.
+                queue += [('write', address, words) for address, words in io.writes(old, image)]
+                old = image
+        self.select_stm32_source(simulation, slave)
+        if any(op[0] == 'image' and op[1] is None for op in ops):
+            self.tool['image'] = {}  # Full rewrite: rebuilt from ACKs only.
+        elif (simulation, slave) != (self.tool['simulation'], self.tool['slave']):
+            raise ValueError('Đổi nguồn/Slave ID: bấm "Lấy quyền điều khiển" lại.')
+        self.tool.update(simulation=bool(simulation), slave=slave, queue=queue, message=label)
+        self.tool['log'].append(f"{datetime.now():%H:%M:%S} {'COM ảo' if simulation else 'COM THẬT'} · {label}")
+        if self.serial_read_pending:
+            self.tool_changed.emit()  # Starts when the background read completes.
+            return
+        self._tool_next()
+
+    def _tool_drop_deferred(self, reason):
+        """Forget commands queued behind a background read (nothing was sent)."""
+        if self.tool['queue'] and not self.tool['inflight']:
+            self.tool['queue'] = []
+            self.tool['message'] = f'Hủy lệnh chưa gửi ({reason}); trạng thái đầu ra không đổi.'
+            self.tool['log'].append(f"{datetime.now():%H:%M:%S} {self.tool['message']}")
+            self.tool_changed.emit()
+
+    def _tool_next(self):
+        tool = self.tool
+        if tool['inflight'] or self.closed:
+            return
+        if not tool['queue']:
+            tool['message'] += ' · Xong (ACK: CPU đã nhận; đầu ra phải kiểm bằng đo).'
+            self.tool_changed.emit()
+            return
+        op = tool['queue'].pop(0)
+        if op[0] == 'wait':
+            tool['inflight'] = True
+            QTimer.singleShot(int(op[1]), self, self._tool_wait_done)
+            self.tool_changed.emit()
+            return
+        address, words = op[1], op[2]
+        tool['inflight'] = True
+        tool['pending'] = (address, words)
+        self.stm32_pending = self.serial_read_pending = True
+        try:
+            self.device.write_stm32(address, words, tool['slave'], tool['simulation'])
+        except ValueError as error:
+            self._stm32_completed('write', None, str(error))
+            return
+        self.tool_changed.emit()
+        self.changed.emit()
+
+    def _tool_wait_done(self):
+        self.tool['inflight'] = False
+        self._tool_next()
+
+    def _tool_completed(self, result, error):
+        tool = self.tool
+        tool['inflight'] = False
+        address, words = tool.pop('pending')
+        if error:
+            tool['queue'].clear()
+            tool['image'] = None  # Executed or not is unknown; never resent.
+            tool['message'] = f'Lỗi: {error} · Trạng thái đầu ra chưa biết.'
+            tool['log'].append(f"{datetime.now():%H:%M:%S} LỖI {error}")
+            self.tool_changed.emit()
+            return
+        if tool['image'] is not None:
+            # ACKed words only: the image is "known" once every owned
+            # register has been written (see tool_image_known).
+            for offset, word in enumerate(words):
+                tool['image'][address + offset] = word
+        self._tool_next()
+
+    def tool_image_known(self):
+        image = self.tool['image']
+        return (image is not None and self.device.io_map is not None
+                and set(self.device.io_map.safe_image()) <= set(image))
+
     def _stm32_completed(self, operation, result, error):
+        tool_write = operation == 'write' and self.tool['inflight'] and 'pending' in self.tool
         self.stm32_pending = self.serial_read_pending = False
+        self.stm32_background = False
         if not error and operation == 'read':
             try:
                 words = register_words(result['values'])
-                if result['address'] != 1 or len(words) != READ_COUNT - 1:
-                    raise ValueError('Phản hồi không đủ mảng Modbus_DI 1–29.')
-                decode_stm32([0] + words)
+                last = self.cpu_map.read_count - 1
+                if result['address'] != 1 or len(words) != last:
+                    raise ValueError(f'Phản hồi không đủ mảng Modbus_DI 1–{last}.')
+                decode_stm32([0] + words, self.cpu_map)
                 self.stm32.mod_buf_to_read[:] = [0] + words
                 self.stm32.received_at = result['timestamp']
                 self.stm32.read_valid = True
-                self.stm32.message = 'Đã đọc DI 1–29; thời điểm lấy mẫu trong MCU chưa xác định.'
+                self.stm32.message = f'Đã đọc DI 1–{last}; thời điểm lấy mẫu trong MCU chưa xác định.'
             except (ValueError, KeyError, TypeError) as exc:
                 error = str(exc)
         elif not error:
@@ -395,6 +687,19 @@ class Backend(QObject):
         if error:
             self.stm32.invalidate()
             self.stm32.message = error
+        elif operation == 'write' and not tool_write and self.tool['image'] is not None:
+            # A raw register write changes words the tool believed it knew.
+            self.tool['image'] = None
+            self.tool['message'] = 'Ghi thanh ghi trực tiếp: trạng thái công cụ chưa biết, cần "Về an toàn".'
+            self.tool_changed.emit()
+        if tool_write:
+            self._tool_completed(result, error)
+        elif self.tool['queue'] and not self.tool['inflight']:
+            # Tool commands queued behind this read.
+            if error:
+                self._tool_drop_deferred(f'lỗi đọc: {error}')
+            else:
+                self._tool_next()
         self.stm32_changed.emit()
         self.changed.emit()
 
@@ -478,6 +783,10 @@ class Backend(QObject):
         return available_serial_ports()
 
     def disconnect_device(self):
+        self.loop_check = None
+        if self.tool['image'] is not None or self.tool['queue']:
+            self.tool.update(image=None, queue=[], message='Đã ngắt kết nối: trạng thái đầu ra chưa biết.')
+            self.tool_changed.emit()
         if self.paused:
             # Outputs were already returned to the safe state when pausing.
             self.session["events"].append({"at": utc_now(), "event": "disconnect_while_paused"})
@@ -496,6 +805,7 @@ class Backend(QObject):
         self.stm32_changed.emit()
         self.serial_result = None
         self.serial_read_pending = False
+        self.stm32_background = False
         self.uart_received_bytes = 0
         self.uart_last_hex = ''
         self.connection = "Chưa kết nối"
@@ -528,9 +838,20 @@ class Backend(QObject):
         self.changed.emit()
         return True
 
-    def start(self):
+    def start(self, confirm_real=False):
+        """``confirm_real``: the operator confirmed the real-hardware run."""
         if not self.can_start:
             return False
+        if self.connection == READY_REAL:
+            blockers = self.real_run_blockers()
+            if blockers:
+                self.message = "Chưa được chạy trên mạch thật: " + " · ".join(blockers)
+                self.changed.emit()
+                return False
+            if not confirm_real:
+                self.message = "Cần người vận hành xác nhận trước khi chạy trên mạch thật."
+                self.changed.emit()
+                return False
         if self.mode != Mode.SELF and not self.serial_number:
             self.message = "Nhập số serial của khối cần kiểm tra."
             self.changed.emit()
@@ -552,14 +873,23 @@ class Backend(QObject):
         self.session = self.session or {
             "schema_version": 1, "id": str(uuid.uuid4()), "started_at": utc_now(),
             "operator": self.username, "serial": self.serial_number if self.mode != Mode.SELF else None,
-            "mode": self.mode.value, "simulation": True, "time_scale": self.time_scale, "adapter": self.adapter,
+            "mode": self.mode.value, "simulation": self.run_simulation, "time_scale": self.effective_time_scale,
+            "adapter": self.adapter, "cpu_map": self.cpu_map.name,
+            "connection": self.connection,
             "profile": deepcopy({"system": self.profile.system, "target": self.profile.target, "hardware": self.profile.hardware, "mock": self.profile.fixtures}),
             "attempts": [], "events": [], "planned": [], "processed": 0,
         }
         self.session.update(state="running", verdict="Đang chạy", ended_at=None)
         self.session["planned"].extend(t["id"] for t in selected)
-        self.session["events"].append({"at": utc_now(), "event": "start", "scenario": self.device.communication.transport.scenario})
+        self.session["events"].append({"at": utc_now(), "event": "start", "real_hardware": not self.run_simulation,
+                                       "operator_confirmed": bool(confirm_real) if not self.run_simulation else None,
+                                       "scenario": self.device.communication.transport.scenario
+                                       if self.run_simulation else None})
         self.device.set_simulation_time_scale(self.time_scale)
+        if self.tool['image'] is not None:
+            # The runner now owns the outputs; the tool must re-take control.
+            self.tool.update(image=None, message='Bộ chạy bài đang điều khiển đầu ra.')
+            self.tool_changed.emit()
         self.queue = list(selected)
         self.phase = "next"
         self._checkpoint()
@@ -696,16 +1026,19 @@ class Backend(QObject):
         self.bench_token = self.token
         try:
             if operation == "prepare":
-                self.message = f"{self.test['id']} · Đọc STM32, ghi trạng thái an toàn và chuẩn bị · MÔ PHỎNG"
-                count = self.device.bench_prepare(self.token, self._sequence(self.test["preparation"]))
+                where = "MÔ PHỎNG" if self.run_simulation else "COM THẬT"
+                self.message = f"{self.test['id']} · Đọc STM32, ghi trạng thái an toàn và chuẩn bị · {where}"
+                count = self.device.bench_prepare(self.token, self._sequence(self.test["preparation"]),
+                                                  self.run_simulation)
             elif operation == "apply":
                 step = self.test["steps"][self.step_index]
                 self.message = f"{self.test['id']} / {step['id']} · {step['title']}"
                 self._invalidate()
-                count = self.device.bench_apply(self.token, step["actions"])
+                count = self.device.bench_apply(self.token, step["actions"], self.run_simulation)
             else:
                 self.message = "Đang ghi trạng thái kết thúc / an toàn"
-                count = self.device.bench_finish(self.token, self._sequence(self.test["cleanup"]))
+                count = self.device.bench_finish(self.token, self._sequence(self.test["cleanup"]),
+                                                 self.run_simulation)
         except ValueError as error:
             self.bench_token = None
             self._fatal(str(error))
@@ -722,7 +1055,7 @@ class Backend(QObject):
             return  # Hold step or operator entry only: nothing to read.
         self.bench_token = str(uuid.uuid4())
         try:
-            count = self.device.bench_measure(self.bench_token, signals)
+            count = self.device.bench_measure(self.bench_token, signals, self.run_simulation)
         except ValueError as error:
             self.bench_token = None
             self._fatal(str(error))
@@ -734,14 +1067,25 @@ class Backend(QObject):
             return
         self.bench_token = None
         if operation == "connect":
+            simulated = result["simulation"] if result else self.run_simulation
+            slave = self.device.io_map.slave
             if error:
-                self.connection = "Lỗi kết nối mô phỏng STM32"
-                self.message = error
-            else:
-                self.connection = "Sẵn sàng · MÔ PHỎNG"
+                self.connection = ("Lỗi kết nối mô phỏng STM32" if simulated
+                                   else f"Không có phản hồi STM32 (slave {slave})")
+                self.message = error if simulated else (
+                    f"{error} · Kiểm tra: CPU đã cấp nguồn; slave ID = 8 + công tắc ID trên bo CPU "
+                    f"(profile đang dùng {slave}, hardware.json → stm32_io.slave); dây RS485 A/B; baud 115200 8N1.")
+            elif simulated:
+                self.connection = READY_SIMULATION
                 self._store_bench_samples(result)
                 self.message = ("MÔ PHỎNG · STM32 giả lập đã trả lời FC03 qua COM ảo (khung Modbus RTU + CRC). "
-                                "Ánh xạ thanh ghi là giả định theo CPUv1.0; MCU không có tín hiệu bảo vệ.")
+                                f"Bản đồ {self.cpu_map.name}; ánh xạ phần cứng là giả định; MCU không có tín hiệu bảo vệ.")
+            else:
+                self.connection = READY_REAL
+                self.loop_check = None
+                self._store_bench_samples(result)
+                self.message = (f"COM THẬT · CPU slave {slave} đã trả lời FC03 ({self.cpu_map.name}). "
+                                "Chạy được tự kiểm tra; bài đo thật cần ánh xạ đã đo kiểm và D02 đạt.")
             self.changed.emit()
             return
         if error:
@@ -841,7 +1185,7 @@ class Backend(QObject):
                 step = self.test["steps"][self.step_index]
                 self._remember_requests(step["actions"], step["id"])
                 self.phase = "settling"
-                self.wait_until = now + self.test["steps"][self.step_index]["wait_ms"] / 1000 / self.time_scale
+                self.wait_until = now + self.test["steps"][self.step_index]["wait_ms"] / 1000 / self.effective_time_scale
             else:
                 self.attempt["cleanup_confirmed"] = True
                 self.attempt["ended_at"] = utc_now()
@@ -874,8 +1218,9 @@ class Backend(QObject):
                 else:
                     self._next_test()
         elif self.phase == "settling":
-            remaining = max(0, (self.wait_until - now) * self.time_scale)
-            self.message = f"{self.test['id']} / {self.test['steps'][self.step_index]['id']} · Chờ ổn định {remaining:.1f} s tiêu chuẩn (×{self.time_scale:g})"
+            scale = self.effective_time_scale
+            remaining = max(0, (self.wait_until - now) * scale)
+            self.message = f"{self.test['id']} / {self.test['steps'][self.step_index]['id']} · Chờ ổn định {remaining:.1f} s tiêu chuẩn (×{scale:g})"
             if now >= self.wait_until:
                 self.phase = "sampling"
                 self.capture_after = now
@@ -928,6 +1273,11 @@ class Backend(QObject):
                 self.measurement_history[check["signal"]] = {
                     "value": sample.value, "status": status, "test_id": self.test["id"], "step_id": step["id"],
                     "at": datetime.now().strftime("%H:%M:%S"), "source": sample.source}
+            if (self.adapter == "stm32" and self.device.io_map.inputs.get(check["signal"], {}).get("kind")
+                    == "loop_probe"):
+                # Remembered for this connection: gates real-hardware test runs.
+                self.loop_check = {"value": sample.value if sample else None, "status": status,
+                                   "simulation": self.run_simulation, "at": utc_now()}
             if status == "ERROR":
                 self._fatal(reason)
                 return
@@ -974,7 +1324,7 @@ class Backend(QObject):
     def resume(self):
         if not self.paused or self.closed or self.shutdown_requested:
             return False
-        if self.connection != "Sẵn sàng · MÔ PHỎNG":
+        if self.connection not in READY_STATES:
             self.message = "Chưa thể tiếp tục: giá thử chưa sẵn sàng."
             self.changed.emit()
             return False
@@ -1037,7 +1387,8 @@ class Backend(QObject):
             notes += f" · Dừng cả lượt vì {self.session['stopped_by']} FAIL"
         if defaults:
             notes += " · Có giá trị mặc định chưa đo"
-        self.message = f"Kết thúc · {verdict}{notes} · Kết quả MÔ PHỎNG"
+        where = "MÔ PHỎNG" if self.session.get("simulation", True) else "COM THẬT"
+        self.message = f"Kết thúc · {verdict}{notes} · Kết quả {where}"
         self._checkpoint()
         if self.shutdown_requested:
             self._close()

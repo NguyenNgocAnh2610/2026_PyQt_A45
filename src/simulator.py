@@ -10,7 +10,7 @@ from src.common.wire import (Opcode, WireError, REQUEST_MAILBOX, RESPONSE_MAILBO
 from src.protocol import WireCodec, decode_frame, frame_to_registers, registers_to_frame
 from src.protocol import (encode_int16, pack_data_t, register_words,
                           rtu_adu, split_rtu_adu)
-from src.common.stm32 import WRITE_COUNT, READ_COUNT, DEFAULT_SLAVE, ReadRegister, WriteRegister
+from src.common.stm32 import DEFAULT_SLAVE, DEFAULT_CPU_MAP, ReadRegister, WriteRegister
 
 
 class Stm32Simulator:
@@ -31,18 +31,21 @@ class Stm32Simulator:
     the last *completed* loop: up to two loops after the write ACK.
     ``loop_ms=0`` applies writes instantly (pure codec tests).
     """
-    def __init__(self, slave=DEFAULT_SLAVE, io_map=None, cases=(), clock=time.monotonic, loop_ms=0):
+    def __init__(self, slave=DEFAULT_SLAVE, io_map=None, cases=(), clock=time.monotonic, loop_ms=0, cpu_map=None):
         self.slave = slave
+        self.cpu_map = io_map.cpu_map if io_map is not None else (cpu_map or DEFAULT_CPU_MAP)
         # Registers a profile declares as a proposed firmware extension
-        # (e.g. SW03/SW04 for a second matrix board) exist only with io_map.
-        self.write_count = io_map.write_count if io_map is not None else WRITE_COUNT
+        # (e.g. extra matrix boards) exist only with io_map.
+        self.write_count = io_map.write_count if io_map is not None else self.cpu_map.write_count
+        self.read_count = self.cpu_map.read_count
         self.mod_buf_to_write = [0] * self.write_count
-        self.mod_buf_to_read = [0] * READ_COUNT
+        self.mod_buf_to_read = [0] * self.read_count
         self.mod_buf_to_read[7:12] = [1234, encode_int16(-567), 2400, 1200, 330]
         self.mod_buf_to_read[12] = 0x4000 | 470  # 4.70 kOhm
         self.mod_buf_to_read[13] = 0x03FF
         self.mod_buf_to_read[14] = encode_int16(-123)
-        self.mod_buf_to_read[20:30] = pack_data_t(b'STM32 SIM')
+        _, first, count = self.cpu_map.uart_buffers[0]
+        self.mod_buf_to_read[first:first + count] = pack_data_t(b'STM32 SIM')[:count]
         self.encoder_triggers = 0
         self.io_map = io_map
         self.cases = list(cases)
@@ -61,9 +64,9 @@ class Stm32Simulator:
             raise ValueError('Giả lập: không có phản hồi từ Slave ID này.')
 
     def read(self, slave):
-        """mod_buf_to_read[1..29], as FC03 address 1, count 29 returns it."""
+        """mod_buf_to_read[1..N-1], as FC03 address 1 returns the whole DI bank."""
         self._check_slave(slave)
-        return self.read_holding(1, READ_COUNT - 1)
+        return self.read_holding(1, self.read_count - 1)
 
     def read_holding(self, address, count):
         self._measure_selected()
@@ -199,7 +202,7 @@ class Stm32RtuSlave:
             address, count = struct.unpack('>HH', pdu[1:])
             if not 1 <= count <= 125:
                 return exception(3)
-            if address + count > READ_COUNT:
+            if address + count > sim.read_count:
                 return exception(2)
             words = sim.read_holding(address, count)
             return rtu_adu(slave, struct.pack('>BB', 3, 2 * count) + struct.pack(f'>{count}H', *words))

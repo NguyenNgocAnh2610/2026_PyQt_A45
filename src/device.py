@@ -9,7 +9,7 @@ from src.communication import Communication, SerialConnection
 from src.protocol import decode_snapshot, WireCodec, encode_frame
 from src.protocol import stm32_write_words, make_read_unit, register_words, Stm32IoMap
 from src.common.serial import SerialSettings
-from src.common.stm32 import DEFAULT_SLAVE, READ_COUNT
+from src.common.stm32 import DEFAULT_SLAVE, cpu_map_for
 from src.common.testing import TRANSACTION_TIMEOUT_MS
 from src.simulator import Stm32Simulator, Stm32RtuSlave
 from src.virtual_port import VirtualLine, VIRTUAL_PORT, create_virtual_connection
@@ -28,10 +28,18 @@ class Device(QObject):
         self.communication = Communication(profile, self)
         self.serial_connection = SerialConnection(self)
         hardware = profile.hardware
-        self.io_map = Stm32IoMap(hardware['stm32_io']) if hardware.get('adapter') == 'stm32' else None
+        self.cpu_map = cpu_map_for(hardware)
+        self.io_map = (Stm32IoMap(hardware['stm32_io'], self.cpu_map)
+                       if hardware.get('adapter') == 'stm32' else None)
+        # Highest DO index + 1 this profile may write (firmware map, plus the
+        # registers it declares as a proposed firmware extension).
+        self.write_limit = self.io_map.write_count if self.io_map else self.cpu_map.write_count
         timing = profile.fixtures.get('stm32_timing', {})
-        self.stm32_simulator = Stm32Simulator(io_map=self.io_map, cases=profile.fixtures.get('stm32_cases', ()),
-                                              loop_ms=timing.get('loop_ms', 0))
+        # The virtual CPU answers at the profile's slave ID, like the real one.
+        sim_slave = self.io_map.slave if self.io_map else (hardware.get('serial', {}).get('slave') or DEFAULT_SLAVE)
+        self.stm32_simulator = Stm32Simulator(slave=sim_slave, io_map=self.io_map,
+                                              cases=profile.fixtures.get('stm32_cases', ()),
+                                              loop_ms=timing.get('loop_ms', 0), cpu_map=self.cpu_map)
         # Simulation = a virtual COM port: real RTU frames to the simulated
         # slave through the same SerialConnection as the physical port.
         self.virtual_line = VirtualLine(Stm32RtuSlave(self.stm32_simulator))
@@ -122,13 +130,14 @@ class Device(QObject):
     def write_stm32(self, address, values, slave=DEFAULT_SLAVE, simulation=True):
         if self._bench is not None:
             raise ValueError('Bộ chạy bài đang dùng STM32.')
-        words = stm32_write_words(address, values)
+        words = stm32_write_words(address, values, self.write_limit)
         self._request_stm32('write', slave, simulation, int(address), words)
 
     def _request_stm32(self, operation, slave, simulation, address=1, values=None, owner='diag'):
         """One Modbus transaction on the real or the virtual COM port; the
         code path after this point is identical for both."""
-        make_read_unit(slave, 3, 1, READ_COUNT - 1)
+        count = self.cpu_map.read_count - 1
+        make_read_unit(slave, 3, 1, count)
         if self._stm32_request is not None:
             raise ValueError('Đang chờ giao dịch STM32.')
         link = self.virtual_connection if simulation else self.serial_connection
@@ -140,7 +149,7 @@ class Device(QObject):
                                    address=address, values=values, owner=owner)
         try:
             if operation == 'read':
-                link.read_registers(slave, 3, 1, READ_COUNT - 1)
+                link.read_registers(slave, 3, 1, count)
             else:
                 link.write_registers(slave, address, values)
         except ValueError:
@@ -339,8 +348,8 @@ class Device(QObject):
         else:
             try:
                 words = [0] + register_words(result['values'])
-                if result['address'] != 1 or len(words) != READ_COUNT:
-                    raise ValueError('Phản hồi không đủ mảng Modbus_DI 1–29.')
+                if result['address'] != 1 or len(words) != self.cpu_map.read_count:
+                    raise ValueError(f'Phản hồi không đủ mảng Modbus_DI 1–{self.cpu_map.read_count - 1}.')
                 if seq is not None and seq.pop('pending_probe', False):
                     probe = seq['probe']
                     adc = tuple(words[7:12])  # ADC0_val … ADC4_val

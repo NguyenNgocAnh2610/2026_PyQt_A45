@@ -199,8 +199,8 @@ class BenchTests(unittest.TestCase):
         self.assertEqual(b.session['verdict'], 'Chưa đầy đủ')
         self.assertIsNone(b.device.communication.transport.last_case)
         # A45 uses the STM32 runner: a BLOCKED test writes nothing to the banks
-        # (31 words: CPUv1.0 map plus the proposed SW03/SW04 extension).
-        self.assertEqual(b.device.stm32_simulator.mod_buf_to_write, [0] * 31)
+        # (37 words: CPUv1.1 map plus the proposed Matrix2_0…Matrix4_1 registers).
+        self.assertEqual(b.device.stm32_simulator.mod_buf_to_write, [0] * 37)
 
     def test_busy_guards_and_view_selection_do_not_change_running_test(self):
         b = self.backend()

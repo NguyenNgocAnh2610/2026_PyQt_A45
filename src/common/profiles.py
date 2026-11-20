@@ -85,7 +85,12 @@ def _validate_profile(profile):
     _require(isinstance(capabilities, list), "hardware", "capabilities phải là danh sách")
     adapter = hardware.get("adapter")
     _require(adapter in ("mock", "stm32"), "hardware.adapter",
-             "Chỉ hỗ trợ mock (A45 v1 cũ) hoặc stm32 (hai mảng CPUv1.0)")
+             "Chỉ hỗ trợ mock (A45 v1 cũ) hoặc stm32 (hai mảng CPU STM32)")
+    from src.common.stm32 import cpu_map_for
+    try:
+        cpu_map = cpu_map_for(hardware)
+    except ValueError as error:
+        raise ProfileError(f"hardware.cpu_map: {error}") from error
     _require(hardware.get("production_ready") is False, "hardware", "Đường chạy thật chưa được phê duyệt")
     from src.protocol import WireCodec
     from src.common.wire import COMMIT_REGISTER, REQUEST_MAILBOX, RESPONSE_MAILBOX
@@ -98,7 +103,7 @@ def _validate_profile(profile):
         raise ProfileError(f'hardware.wire_signals: {error}') from error
     sequences = target.get("sequences", {})
     if adapter == "stm32":
-        _validate_stm32_io(hardware.get("stm32_io"), signals)
+        _validate_stm32_io(hardware.get("stm32_io"), signals, cpu_map)
         _require(isinstance(sequences, dict) and sequences, "target.sequences", "Thiếu trình tự chuẩn bị/kết thúc")
         for name, sequence in sequences.items():
             where = f"sequences.{name}"
@@ -186,19 +191,20 @@ def _int(value, low, high):
     return type(value) is int and low <= value <= high
 
 
-def _validate_stm32_io(io, signals):
-    """Structure of the CPUv1.0 runner map; bench semantics stay 'assumed'."""
-    from src.common.stm32 import BENCH_WRITABLE, IO_STATUSES, ReadRegister, WriteRegister, WRITE_COUNT
+def _validate_stm32_io(io, signals, cpu_map):
+    """Structure of the runner map for one CPU firmware; semantics stay 'assumed'."""
+    from src.common.stm32 import IO_STATUSES
     where = "hardware.stm32_io"
     _require(isinstance(io, dict), where, "Thiếu ánh xạ thanh ghi cho adapter stm32")
     extra = io.get("extra_write_registers", {})
     _require(isinstance(extra, dict), where, "extra_write_registers phải là object")
+    last = cpu_map.array_words - 1
     for name, address in extra.items():
-        # Proposed CPU firmware extension: the firmware arrays hold 32 words.
-        _require(name not in WriteRegister.__members__ and _int(address, WRITE_COUNT, 31), where,
-                 f"Thanh ghi mở rộng {name} phải có tên mới và index {WRITE_COUNT}–31")
+        # Proposed CPU firmware extension: only room left in the firmware arrays.
+        _require(not cpu_map.has_write(name) and _int(address, cpu_map.write_count, last), where,
+                 f"Thanh ghi mở rộng {name} phải có tên mới và index {cpu_map.write_count}–{last} ({cpu_map.name})")
     _require(len(set(extra.values())) == len(extra), where, "Index thanh ghi mở rộng bị trùng")
-    writable = {r.name for r in BENCH_WRITABLE} | set(extra)
+    writable = set(cpu_map.bench_writable) | set(extra)
     _require(_int(io.get("slave"), 1, 247), where, "slave phải từ 1 đến 247")
     _require(io.get("mux_register") in writable, where, "mux_register không hợp lệ")
     for key in ("mux_settle_ms", "di_update_ms", "break_ms"):
@@ -207,7 +213,10 @@ def _validate_stm32_io(io, signals):
     banks, bank_bits = layout.get("banks", 1), layout.get("bank_bits", 16)
     _require(isinstance(layout, dict) and _int(banks, 1, 16) and _int(bank_bits, 1, 16) and banks * bank_bits <= 16,
              f"{where}.mux_layout", "banks × bank_bits phải ≤ 16 bit")
-    channels = 1 << bank_bits
+    # RLMUX firmware indexes Mux_Decoder[32] without a bounds check: a channel
+    # >= channels would drive random relays, so the limit is mandatory.
+    channels = layout.get("channels", 1 << bank_bits)
+    _require(_int(channels, 1, 1 << bank_bits), f"{where}.mux_layout", "channels phải từ 1 tới 2^bank_bits")
     _require(_int(layout.get("idle_channel", 0), 0, channels - 1), f"{where}.mux_layout", "idle_channel ngoài dải")
     for key in ("session", "safe_state"):
         block = io.get(key)
@@ -233,7 +242,7 @@ def _validate_stm32_io(io, signals):
 
     dac = io.get("dac")
     if dac is not None:
-        _require(isinstance(dac, dict) and dac.get("register") == WriteRegister.DAC_val.name, f"{where}.dac",
+        _require(isinstance(dac, dict) and dac.get("register") == "DAC_val", f"{where}.dac",
                  "DAC phải dùng DAC_val")
         _require(all(_number(dac.get(k)) for k in ("scale", "offset", "min", "max")) and dac["scale"] != 0
                  and dac["min"] < dac["max"], f"{where}.dac", "scale/offset/min/max không hợp lệ")
@@ -302,8 +311,8 @@ def _validate_stm32_io(io, signals):
             _require(_int(entry.get("duration_ms"), 100, 60000) and _int(entry.get("poll_ms"), 1, 1000), sid,
                      "duration_ms/poll_ms không hợp lệ")
             continue
-        _require(kind == "adc" and entry.get("register") in ReadRegister.__members__
-                 and entry["register"] != "Null", sid, "Input phải là adc với register DI hợp lệ")
+        _require(kind == "adc" and cpu_map.has_read(entry.get("register"))
+                 and entry["register"] != "Null", sid, f"Input phải là adc với register DI hợp lệ ({cpu_map.name})")
         _require(isinstance(entry.get("signed"), bool), sid, "Thiếu signed")
         _require(_number(entry.get("scale")) and entry["scale"] != 0 and _number(entry.get("offset", 0)), sid,
                  "scale/offset không hợp lệ")
@@ -318,9 +327,10 @@ def _validate_stm32_io(io, signals):
 def _validate_stm32_plan(profile):
     """Every stimulus/measurement is mapped and every step's image encodes."""
     from src.protocol import Stm32IoMap, UnsupportedSignal
+    from src.common.stm32 import cpu_map_for
     io = profile.hardware["stm32_io"]
     sequences = profile.target["sequences"]
-    io_map = Stm32IoMap(io)
+    io_map = Stm32IoMap(io, cpu_map_for(profile.hardware))
     _require(io["safe_state"][io["mux_register"]] == io_map.mux_word(), "hardware.stm32_io.safe_state",
              f"MUX an toàn phải là {io_map.mux_word()} (mọi bank ở idle_channel)")
     for name, sequence in sequences.items():
@@ -370,9 +380,29 @@ def stm32_unsupported(profile, test):
     """Reasons the CPUv1.0 map cannot run this test (empty for mock adapter)."""
     if profile.hardware.get("adapter") != "stm32":
         return []
+    actions, signals = _test_io(profile, test)
+    return stm32_io_map(profile).unsupported(actions, signals)
+
+
+def stm32_io_map(profile):
     from src.protocol import Stm32IoMap
+    from src.common.stm32 import cpu_map_for
+    return Stm32IoMap(profile.hardware["stm32_io"], cpu_map_for(profile.hardware))
+
+
+def _test_io(profile, test):
     sequences = profile.target["sequences"]
     actions = sequences[test["preparation"]]["actions"] + sequences[test["cleanup"]]["actions"]
     actions += [a for step in test["steps"] for a in step["actions"]]
     signals = [c["signal"] for step in test["steps"] for c in step["checks"]]
-    return Stm32IoMap(profile.hardware["stm32_io"]).unsupported(actions, signals)
+    return actions, signals
+
+
+def stm32_unverified(profile, test):
+    """Mapping entries a test uses that were not checked on the bench yet.
+
+    Real-hardware runs are allowed only when this is empty (AGENTS.md)."""
+    if profile.hardware.get("adapter") != "stm32":
+        return ["adapter mock không có đường chạy mạch thật"]
+    actions, signals = _test_io(profile, test)
+    return stm32_io_map(profile).verification(actions, signals)

@@ -72,3 +72,6 @@ SCENARIOS = {
 # cannot be represented on the two-bank runner.
 STM32_SCENARIOS = {k: v for k, v in SCENARIOS.items() if k not in ("protection", "stale")}
 READY_SIMULATION = "Sẵn sàng · MÔ PHỎNG"
+# Real CPU answered FC03 on the open COM port (stm32 adapter only).
+READY_REAL = "Sẵn sàng · COM THẬT"
+READY_STATES = (READY_SIMULATION, READY_REAL)

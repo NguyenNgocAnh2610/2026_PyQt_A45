@@ -1,4 +1,4 @@
-"""CPUv1.0 contract, async native Modbus and UI; no real COM opened."""
+"""CPU register contracts (CPUv1.0 default, CPUv1.1 for A45), async native Modbus and UI; no real COM opened."""
 import tempfile
 import time
 import unittest
@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtTest import QTest, QSignalSpy
 from PySide6.QtSerialBus import QModbusDevice
 
-from src.common.stm32 import Stm32RegisterBanks, WriteRegister as WO, ReadRegister as RI
+from src.common.stm32 import Stm32RegisterBanks, WriteRegister as WO, ReadRegister as RI, CPU_V10, CPU_V11
 from src.common.serial import SerialSettings
 from src.protocol import (encode_int16, decode_int16, pack_data_t, unpack_data_r,
                           encode_encoder, decode_stm32, stm32_write_words)
@@ -38,6 +38,8 @@ class RegisterCodecTests(unittest.TestCase):
     def test_two_independent_layouts_and_instances(self):
         first, second = Stm32RegisterBanks(), Stm32RegisterBanks()
         self.assertEqual((len(first.mod_buf_to_write), len(first.mod_buf_to_read)), (29, 30))
+        v11 = Stm32RegisterBanks(CPU_V11)
+        self.assertEqual((len(v11.mod_buf_to_write), len(v11.mod_buf_to_read)), (31, 43))
         first.mod_buf_to_write[WO.DAC_val] = 777
         self.assertEqual(first.mod_buf_to_read[RI.ADC0_val], 0)
         self.assertEqual(second.mod_buf_to_write[WO.DAC_val], 0)
@@ -71,6 +73,25 @@ class RegisterCodecTests(unittest.TestCase):
         self.assertIsNone(values['received_length'])
         words[RI.Ohm_val] = 0xFFFF
         self.assertIsNone(decode_stm32(words)['resistance_ohms'])
+        self.assertEqual(decode_stm32(words)['received']['DataR'][:9], b'STM32 SIM')
+
+    def test_cpu_v11_map_matches_firmware_sources(self):
+        # CPUv1.1 For DK_QDT System_Register.h: Matrix[2] at 18–19, CDT at 20,
+        # DataT[10] at 21–30; DI DataR1[5]/DataR2[5]/DataR3[8]/DataR4[5] at 20–42.
+        self.assertEqual([CPU_V11.write_index(n) for n in ('Matrix0', 'Matrix1', 'CDT', 'DataT0', 'DataT9')],
+                         [18, 19, 20, 21, 30])
+        self.assertEqual(CPU_V10.write_index('CDT'), 18)
+        for name in ('Mode', 'DAC_val', 'MUX', 'Power', 'DataO5'):  # Common 0–17 layout.
+            self.assertEqual(CPU_V11.write_index(name), CPU_V10.write_index(name))
+        self.assertEqual([CPU_V11.read_index(n) for n in ('CDN', 'DataR1_0', 'DataR3_0', 'DataR4_4')], [19, 20, 30, 42])
+        self.assertIn('Matrix0', CPU_V11.bench_writable)
+        self.assertNotIn('CDT', CPU_V11.bench_writable)
+        sim = Stm32Simulator(cpu_map=CPU_V11)
+        decoded = decode_stm32(sim.mod_buf_to_read, CPU_V11)
+        self.assertEqual(list(decoded['received']), ['DataR1', 'DataR2', 'DataR3', 'DataR4'])
+        self.assertEqual(decoded['adc_volts'][0], 12.34)
+        with self.assertRaises(ValueError):
+            decode_stm32(sim.mod_buf_to_read)  # A v1.1 DI bank is not a v1.0 bank.
 
     def test_simulator_does_not_echo_outputs_and_consumes_encoder_once(self):
         sim = Stm32Simulator()
@@ -210,7 +231,7 @@ class Stm32BackendTests(unittest.TestCase):
         self.assertFalse(b.stm32.read_valid)
         b.request_stm32()
         QTest.qWait(60)
-        b.select_stm32_source(False, 9)
+        b.select_stm32_source(False, 11)
         self.assertFalse(b.stm32.read_valid)
         b.request_stm32()
         b.disconnect_device()
@@ -221,9 +242,18 @@ class Stm32BackendTests(unittest.TestCase):
     def test_real_path_full_read_and_write_ack_then_loss(self):
         b = self.backend
         b.connect_serial(SerialSettings('rtu', 'COM_TEST', 115200))
+        # Opening a Modbus RTU port first verifies the CPU with one FC03 (no write).
+        QTest.qWait(20)  # The runner sequence never completes inside the caller.
+        verify = b.device.serial_connection.reply
+        self.assertEqual((verify.slave, verify.unit.startAddress(), verify.unit.valueCount()), (11, 1, 42))
+        self.assertEqual(b.connection, 'Đang xác minh STM32 thật')
+        with self.assertRaises(ValueError):
+            b.request_stm32(simulation=False)  # One transaction at a time.
+        verify.finish()
+        self.assertEqual(b.connection, 'Sẵn sàng · COM THẬT')
         b.request_stm32(simulation=False)
         reply = b.device.serial_connection.reply
-        self.assertEqual((reply.slave, reply.unit.startAddress(), reply.unit.valueCount()), (9, 1, 29))
+        self.assertEqual((reply.slave, reply.unit.startAddress(), reply.unit.valueCount()), (11, 1, 42))
         reply.unit.setValue(6, 5432)
         reply.finish()
         self.assertEqual(b.stm32.mod_buf_to_read[7], 5432)

@@ -10,7 +10,7 @@ phần mềm hoàn thiện (mục 9).
 
 | Tình huống | Cần làm |
 |---|---|
-| Vẫn dùng STM32 CPUv1.0 (cùng bản đồ thanh ghi); chỉ khác khối/bài/tín hiệu/dải | Tạo profile JSON mới (mục 2–4), sửa vài nhãn Login (mục 6) |
+| Vẫn dùng STM32 CPUv1.0 hoặc CPUv1.1 (bản đồ đã có trong `CPU_MAPS`); chỉ khác khối/bài/tín hiệu/dải/bo con | Tạo profile JSON mới (mục 2–4), chọn `hardware.cpu_map`, sửa vài nhãn Login (mục 6) |
 | Cần tiêu chí khác `nominal ± tolerance`, hoặc thao tác chưa có (xung, đo tần số, UART/SSI…) | JSON + sửa mã (mục 7) |
 | MCU hoặc bản đồ thanh ghi khác CPUv1.0 | JSON + sửa mã tầng giao thức/thiết bị (mục 7) |
 
@@ -32,6 +32,7 @@ chuyển kết quả vào JSON và xóa phiếu.
 |---|---|---|---|
 | 3.1 | `system.json` | `id`, `name`, `subtitle`; khai báo **mọi** tín hiệu (đo, lệnh, trạng thái) với đơn vị đúng; `status_signals`; bài tự kiểm tra `diagnostics` | CONFIGURATION → system.json |
 | 3.2 | File đối tượng | `id`, `name`, `version`; chép **nguyên văn** tài liệu vào `source_paragraphs`; `sequences` (chuẩn bị/kết thúc, ghi `basis`); từng bài/bước với `actions`, `wait_ms`, `checks` (`nominal`, `tolerance`) | CONFIGURATION → File đối tượng |
+| 3.3a | `hardware.json` | **Đọc firmware CPU** để chọn `cpu_map` (so `System_Register.h`: index `Matrix`/`CDT`, kích thước mảng) và slave ID (CPUv1.1: 8 + công tắc ID). Đọc firmware bo con: slave ID, mỗi thanh ghi điều khiển gì, có kiểm giới hạn không (ví dụ RLMUX không kiểm kênh < 32 → đặt `mux_layout.channels`) | STM32_MODBUS_PC mục 3.1, 9.11 |
 | 3.3 | `hardware.json` | Mỗi tín hiệu dùng trong `actions`/`checks`/`sequences` có mục `stm32_io`. **Phân bổ bit** (mục 3a): rơ-le nguồn và lệnh bật/tắt là output `bit`; chân nhận nhiều mức đi qua bo matrix (`matrix_boards` + `sources`); đo qua MUX (số kênh) vào ADC; số đo ngoài nhập tay là input `manual`. Mục chưa đo kiểm để `assumed`; mục phần cứng không làm được để `unsupported` + `reason`. Thêm tín hiệu mới vào `wire_signals` | CONFIGURATION → hardware.json |
 | 3.4 | `mock.json` | `stm32_cases`: "khi các lệnh X đang bật thì khối trả Y" (dữ liệu demo, độc lập với dải tiêu chuẩn). `stm32_timing.loop_ms` = chu kỳ vòng lặp MCU; `hardware.json` → `stm32_io.di_update_ms` ≥ 2 × giá trị này | CONFIGURATION → mock.json |
 
@@ -80,10 +81,15 @@ conda run -n qt_env python -B -m unittest discover -s tests
 
 ## 5. Ghép mạch thật
 
-Hiện **chưa có** đường chạy bài trên mạch thật. Trước đó phải đáp ứng
-[STM32_MODBUS_PC.md mục 10](STM32_MODBUS_PC.md#10-điều-kiện-trước-khi-chạy-bài-trên-mạch-thật):
-chốt ánh xạ, liên động, trình tự nguồn/dừng; đọc thử FC03 và đối chiếu số đo
-bằng màn hình hai mảng.
+1. Mở COM ở chế độ Modbus RTU: phần mềm tự đọc FC03; phải thấy "Sẵn sàng · COM THẬT". Sai slave → kiểm công tắc ID
+   và `stm32_io.slave`.
+2. Chạy **Tự kiểm tra** (D01, D02). D02 cho chu kỳ vòng lặp CPU thật: chỉnh `di_update_ms` (≥ 2 chu kỳ), `break_ms`,
+   ngưỡng D02 và `stm32_timing.loop_ms` theo số đo. Chu kỳ lớn bất thường thường do CPU gửi tới bo không lắp
+   (+100 ms mỗi khung gửi tới bo vắng; A45 với CPUv1.1 gốc ≈ 360–380 ms, STM32_MODBUS_PC mục 9.2).
+3. Dùng trang **Test Modbus** kiểm từng rơ-le nguồn, từng điểm giao matrix, từng kênh MUX bằng đồng hồ; đo bảng DAC.
+   Mục nào đúng thì đổi `status` thành `verified` (bo matrix, DAC, output, input).
+4. Bài đo chạy trên mạch thật khi mọi mục nó dùng đã `verified` và D02 đạt; có hộp thoại xác nhận trước mỗi lượt.
+   Chi tiết: [STM32_MODBUS_PC.md mục 10](STM32_MODBUS_PC.md).
 
 ## 6. Nhãn cố định trong mã
 
@@ -125,15 +131,17 @@ cập nhật tài liệu liên quan và `PROGRESS.md`.
 ## 9. Giới hạn hiện tại và lịch sử tài liệu
 
 Giới hạn (2026-11-18):
-- Bộ chạy bài chỉ chạy với simulator; chưa có đường chạy mạch thật.
+- Chạy trên mạch thật mở theo từng bài (`verified`); chưa có bài đo nào được kiểm trên mạch.
 - Một profile mỗi lần khởi động; chưa đổi profile khi đang chạy.
 - Tiêu chí chỉ có dạng `nominal ± tolerance` (có thể so trị tuyệt đối).
 - Thao tác: bật/tắt bit, chọn nguồn qua bo matrix, một mức DAC tại một thời điểm, đo ADC qua MUX, nhập tay.
 - Bo matrix chỉ hỗ trợ bố cục `out*8+in` (8 đầu vào).
-- Bản đồ thanh ghi STM32 dùng chung cho mọi profile (theo CPUv1.0).
+- Bản đồ thanh ghi chọn trong `CPU_MAPS` (CPUv1.0, CPUv1.1); firmware khác phải thêm bản đồ vào `src/common/stm32.py` kèm test.
 - `wire_signals` của giao thức cũ vẫn bắt buộc.
 
 Lịch sử:
 - 2026-11-18: bản đầu tiên.
 - 2026-11-18: chuẩn hóa tài liệu; chỉ giữ quy trình, phần schema chuyển về CONFIGURATION.md.
 - 2026-11-18: thêm mục 3a (phân bổ bit, bo matrix, tránh bit HMI, liên động), nhập tay, giá trị tạm có `basis`.
+- 2026-11-19: thêm bước 3.3a (đọc firmware chọn `cpu_map`, slave, giới hạn bo con); mục 5 thành quy trình ghép mạch thật
+  (xác minh FC03, D02, Test Modbus, `verified`).

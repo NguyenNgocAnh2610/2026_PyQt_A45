@@ -21,6 +21,8 @@ from src.ui.widgets.connection_bar import ConnectionBar
 from src.ui.widgets.signal_monitor import SignalMonitor
 from src.ui.widgets.navigation_stack import NavigationStack
 from src.ui.widgets.manual_input import ManualInputDialog
+from src.ui.widgets.modbus_test import ModbusTestPage
+from src.common.testing import READY_REAL
 
 
 STATUS_TEXT = {'PAUSED': 'Tạm dừng'}
@@ -132,8 +134,10 @@ class MainWindow(QMainWindow):
             2: ('Tổng quan', 'Không gian tổng quan hệ thống'),
             3: ('Lịch sử', 'Không gian tra cứu phiên kiểm tra'),
             4: ('In / Xuất file', 'Không gian báo cáo và xuất dữ liệu'),
+            5: ('Test Modbus', 'Giao tiếp CPU · Điều khiển bo con · Đọc giá trị'),
         }
-        for text, page in [('⌂  Tổng quan', 2), ('▣  Kiểm tra', 0), ('◷  Lịch sử', 3), ('▤  In / Xuất file', 4), ('⚙  Cài đặt', 1)]:
+        for text, page in [('⌂  Tổng quan', 2), ('▣  Kiểm tra', 0), ('⇄  Test Modbus', 5), ('◷  Lịch sử', 3),
+                           ('▤  In / Xuất file', 4), ('⚙  Cài đặt', 1)]:
             button = QPushButton(text)
             button.setCheckable(True)
             button.setCursor(Qt.PointingHandCursor)
@@ -157,6 +161,8 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self._settings())
         for index in (2, 3, 4):
             self.pages.addWidget(self._placeholder(self.page_titles[index][0]))
+        self.modbus_page = ModbusTestPage(self.backend)
+        self.pages.addWidget(self.modbus_page)
         body.addWidget(self.pages, 1)
         outer.addLayout(body, 1)
         self._navigate(0)
@@ -400,11 +406,34 @@ class MainWindow(QMainWindow):
             self._notify('Chưa nhập số serial', 'Vui lòng nhập số serial của khối trước khi bắt đầu kiểm tra.')
             self.serial_edit.setFocus()
             return
-        if not self.connection_bar.simulation_selected or not self.backend.can_start:
-            self._notify('Giá thử chưa sẵn sàng', 'Hãy kết nối giá thử và kiểm tra trạng thái sẵn sàng trước khi bắt đầu.')
+        if not self.backend.can_start:
+            self._notify('Giá thử chưa sẵn sàng',
+                         'Hãy kết nối giá thử (Mô phỏng, hoặc COM thật ở chế độ Modbus RTU) và chờ trạng thái '
+                         f'"Sẵn sàng" trước khi bắt đầu.\n\nTrạng thái hiện tại: {self.backend.connection}\n'
+                         f'{self.backend.message}')
             return
         self.backend.configure(serial_number=self.serial_edit.text())
-        if not self.backend.start():
+        confirmed = False
+        if self.backend.connection == READY_REAL:
+            blockers = self.backend.real_run_blockers()
+            if blockers:
+                self._notify('Chưa được chạy trên mạch thật',
+                             'Bài đo thật chỉ chạy khi mọi ánh xạ đã đo kiểm ("verified") và tự kiểm tra D02 đạt '
+                             '(AGENTS.md).\n\n' + '\n'.join(f'• {b}' for b in blockers[:12])
+                             + (f'\n… và {len(blockers) - 12} mục khác' if len(blockers) > 12 else ''))
+                return
+            answer = QMessageBox.warning(
+                self, 'Chạy trên MẠCH THẬT',
+                f'Chế độ: {self.backend.mode.value}. Bộ chạy bài sẽ ghi Mode=1 và điều khiển đầu ra thật '
+                f'(CPU slave {self.backend.device.io_map.slave}).\n\n'
+                '• Khối/đối tượng đã nối đúng, nguồn ngoài sẵn sàng?\n'
+                '• Dừng khẩn / atomat trong tầm tay?\n'
+                '• Lỗi giữa chừng: phần mềm KHÔNG tự ghi lại trạng thái an toàn.\n\nBắt đầu?',
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if answer != QMessageBox.Yes:
+                return
+            confirmed = True
+        if not self.backend.start(confirm_real=confirmed):
             self._notify('Chưa thể bắt đầu', self.backend.message)
 
     def _toggle_pause(self):

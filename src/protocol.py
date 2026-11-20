@@ -11,7 +11,8 @@ from dataclasses import dataclass
 from PySide6.QtSerialBus import QModbusDataUnit
 
 from src.common.testing import Sample
-from src.common.stm32 import READ_COUNT, WRITE_COUNT, ReadRegister as RI, ReadRegister, WriteRegister
+from src.common.stm32 import (READ_COUNT, WRITE_COUNT, ReadRegister as RI, ReadRegister, WriteRegister,
+                              DEFAULT_CPU_MAP)
 from src.common.wire import MAGIC, VERSION, MAX_PAYLOAD, MAX_FRAME, MAX_SIGNALS, OPERATIONS, Opcode, QUALITY
 
 
@@ -65,10 +66,12 @@ def stm32_write_words(address, values, limit=WRITE_COUNT):
     return words
 
 
-def decode_stm32(words):
+def decode_stm32(words, cpu_map=DEFAULT_CPU_MAP):
+    """Decode a full DI bank (index 0 = Null). Index 1–19 are identical in
+    every supported firmware; the UART receive buffers depend on ``cpu_map``."""
     words = register_words(words)
-    if len(words) != READ_COUNT:
-        raise ValueError('Mảng đọc STM32 cần 30 phần tử, gồm Null tại 0.')
+    if len(words) != cpu_map.read_count:
+        raise ValueError(f'Mảng đọc {cpu_map.name} cần {cpu_map.read_count} phần tử, gồm Null tại 0.')
     resistance = words[RI.Ohm_val]
     metric = resistance >> 14
     amount = (resistance & 0x3FFF) / 100.0
@@ -81,21 +84,24 @@ def decode_stm32(words):
         'encoder_a': words[RI.DataI2], 'encoder_b': words[RI.DataI3],
         'encoder_num_pulse': decode_int16(words[RI.DataI4]),
         'ssi_ident': words[RI.DataI5],
-        'received_bytes': unpack_data_r(words[RI.DataR0:RI.DataR9 + 1]),
+        # Low byte first inside each word; the valid length is unknown (CDN).
+        'received': {name: struct.pack(f'<{count}H', *words[first:first + count])
+                     for name, first, count in cpu_map.uart_buffers},
         'received_length': None,
     }
 
 
 class UnsupportedSignal(ValueError):
-    """The configured CPUv1.0 hardware cannot drive or measure this signal."""
+    """The configured hardware cannot drive or measure this signal."""
 
 
 class Stm32IoMap:
-    """Logical bench signals <-> CPUv1.0 DO/DI words. Pure mapping, no I/O.
+    """Logical bench signals <-> CPU DO/DI words. Pure mapping, no I/O.
 
     An *image* is ``{DO address: uint16}`` for the registers the runner owns.
-    Defaults in ``hardware.stm32_io`` follow CPUv1.0 and stay ``assumed`` until
-    verified on the bench; this class never decides that an output is safe.
+    Register names resolve through the firmware map (``hardware.cpu_map``);
+    entries stay ``assumed`` until verified on the bench; this class never
+    decides that an output is safe.
 
     Output kinds:
     - ``bit``: one relay/DOUT bit that switches a fixed source (``on_value``);
@@ -105,15 +111,18 @@ class Stm32IoMap:
       pin is connected to at most one input at a time; ``None`` leaves it open.
     """
 
-    def __init__(self, io):
+    def __init__(self, io, cpu_map=DEFAULT_CPU_MAP):
+        self.cpu_map = cpu_map
         self.slave = io['slave']
         self.extra = {name: int(address) for name, address in io.get('extra_write_registers', {}).items()}
-        self.write_count = max([WRITE_COUNT] + [address + 1 for address in self.extra.values()])
+        self.write_count = max([cpu_map.write_count] + [address + 1 for address in self.extra.values()])
         self.mux = self.address(io['mux_register'])
         layout = io.get('mux_layout', {})
         self.mux_banks = layout.get('banks', 1)
         self.mux_bank_bits = layout.get('bank_bits', 16)
         self.mux_idle = layout.get('idle_channel', 0)
+        # Valid channels per bank (RLMUX: 32; its firmware does not bound-check).
+        self.mux_channel_count = layout.get('channels', 1 << self.mux_bank_bits)
         self.mux_settle_ms = io['mux_settle_ms']
         self.di_update_ms = io.get('di_update_ms', 0)
         # Break-before-make: opened relays must be executed by the MCU loop
@@ -124,6 +133,7 @@ class Stm32IoMap:
         self.inputs = io['inputs']
         self.outputs = dict(io.get('outputs', {}))
         self.outputs.update(self._matrix_pins(io))
+        self._boards = {board['id']: board for board in io.get('matrix_boards', [])}
         base = {**io['safe_state'], **io['session']}
         self._base = {self.address(name): value for name, value in base.items()}
         self.relay_registers = {self.address(register) for entry in self.outputs.values()
@@ -133,7 +143,7 @@ class Stm32IoMap:
         """DO index of a CPUv1.0 register or of a declared firmware extension."""
         if name in self.extra:
             return self.extra[name]
-        return int(WriteRegister[name])
+        return self.cpu_map.write_index(name)
 
     @staticmethod
     def _matrix_pins(io):
@@ -289,6 +299,32 @@ class Stm32IoMap:
                     reasons.append(reason)
         return reasons
 
+    def verification(self, actions=(), signals=()):
+        """Mapping entries a run relies on that are not yet 'verified'.
+
+        Used to gate runs on real hardware (AGENTS.md: only mappings checked
+        on the bench). Returns human-readable reasons; empty = all verified."""
+        pending = []
+
+        def note(label, status):
+            if status != 'verified' and label not in pending:
+                pending.append(label)
+        for sid in dict.fromkeys(a['signal'] for a in actions):
+            entry = self.outputs.get(sid)
+            if entry is None:
+                continue
+            note(f'{sid} ({entry["status"]})', entry['status'])
+            if entry.get('kind') == 'pin':
+                board = self._boards.get(entry['board'], {})
+                note(f'bo matrix {entry["board"]} ({board.get("status")})', board.get('status'))
+                if entry.get('dac') is not None and self.dac is not None:
+                    note(f'DAC ({self.dac.get("status")})', self.dac.get('status'))
+        for sid in dict.fromkeys(signals):
+            entry = self.inputs.get(sid)
+            if entry is not None and entry.get('kind') != 'manual':
+                note(f'{sid} ({entry["status"]})', entry['status'])
+        return pending
+
     def mux_word(self, entry=None):
         """MUX word selecting ``entry``'s channel; other banks stay idle."""
         word = 0
@@ -296,6 +332,11 @@ class Stm32IoMap:
             channel = entry['mux'] if entry is not None and entry.get('mux_bank', 0) == bank else self.mux_idle
             word |= channel << (bank * self.mux_bank_bits)
         return word
+
+    def mux_channels(self, word):
+        """Channel per bank encoded in a MUX word."""
+        mask = (1 << self.mux_bank_bits) - 1
+        return [(word >> (bank * self.mux_bank_bits)) & mask for bank in range(self.mux_banks)]
 
     def groups(self, signals):
         """[(MUX word | None, [signals])]; one FC03 per group."""
@@ -312,7 +353,7 @@ class Stm32IoMap:
         entry = self._input(sid)
         if entry['kind'] == 'link':
             return 1  # Only the fact that a valid FC03 reply arrived.
-        raw = words[ReadRegister[entry['register']]]
+        raw = words[self.cpu_map.read_index(entry['register'])]
         value = decode_int16(raw) if entry['signed'] else raw
         return round(value * entry['scale'] + entry.get('offset', 0), 9)
 

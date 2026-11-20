@@ -35,8 +35,10 @@ def main() -> int:
     parser.add_argument("--capture", type=Path)
     parser.add_argument("--width", type=int, default=1560)
     parser.add_argument("--height", type=int, default=940)
-    parser.add_argument("--state", choices=("idle", "running", "paused", "finished", "stale", "manual"), default="idle",
-                        help="manual = P01 tới hộp thoại nhập tần số; các trạng thái khác tự bỏ qua nhập tay")
+    parser.add_argument("--state", choices=("idle", "running", "paused", "finished", "stale", "manual", "modbus"),
+                        default="idle",
+                        help="manual = P01 tới hộp thoại nhập tần số; modbus = trang Test Modbus trên COM ảo "
+                             "(lấy quyền, bật vài đầu ra); các trạng thái khác tự bỏ qua nhập tay")
     parser.add_argument("--scenario", choices=SCENARIOS, default="normal")
     parser.add_argument("--connection", choices=('mock', 'rtu', 'uart'), default='mock',
                         help='Preview lựa chọn kết nối; không tự mở COM')
@@ -63,9 +65,29 @@ def main() -> int:
         backend.manual_input_changed.connect(
             lambda: backend.manual_request and QTimer.singleShot(300, lambda: backend.submit_manual({})))
 
+    modbus_steps = [
+        lambda: window._navigate(5),
+        lambda: backend.tool_take_control(True, backend.tool['slave']),
+        lambda: backend.tool_set([{'signal': 'dc_27v', 'value': 1}, {'signal': 'set_40', 'value': 3}]),
+        lambda: backend.tool_set_word('MUX', 31 << 8 | 8),
+        lambda: backend.request_stm32(simulation=True),
+    ]
+
     def capture():
         nonlocal elapsed, started
         elapsed += 100
+        if args.state == "modbus":
+            if modbus_steps and not (backend.tool_busy or backend.serial_read_pending) and elapsed % 400 == 0:
+                modbus_steps.pop(0)()
+            ready = not modbus_steps and not backend.serial_read_pending and elapsed >= 2500
+            if args.capture and ready:
+                timer.stop()
+                args.capture.parent.mkdir(parents=True, exist_ok=True)
+                app.processEvents()
+                window.grab().save(str(args.capture))
+                print(f"Captured {args.capture}")
+                window.close()
+            return
         if args.state != "idle" and not started and backend.connection == "Sẵn sàng · MÔ PHỎNG":
             backend.configure(mode=Mode.AUTO if args.state in ("finished", "paused") else Mode.MANUAL,
                               serial_number="DEMO-1101K-001",
@@ -98,7 +120,7 @@ def main() -> int:
             print(f"Captured {args.capture}; state={backend.phase}".encode('ascii', 'backslashreplace').decode('ascii'))
             window.close()
 
-    if args.state != "idle":
+    if args.state not in ("idle", "modbus"):
         backend.connect_device()
     if args.capture or args.state != "idle":
         timer.timeout.connect(capture)

@@ -12,7 +12,7 @@
     "baudrate": 115200,
     "parity": "N",
     "stop_bits": 1,
-    "slave": 9
+    "slave": 11
   },
   "registers": {
     "commit": 4095,
@@ -20,8 +20,8 @@
     "response_mailbox": 8192
   },
   "unresolved": [
-    "Bộ chạy bài ghi/đọc hai mảng STM32 CPUv1.0 (FC03/06/16). Mọi ánh xạ trong stm32_io là GIẢ ĐỊNH: bảng phân bổ bit để đi dây (2026-11-18), chưa xác minh trên giá thử. Danh sách cần kiểm: PROGRESS.md mục \"Cần kiểm khi lên phần cứng thật\".",
-    "Bo matrix 2 (SW03/SW04) cần sửa firmware CPU; chưa sửa thì các chân của bo này không điều khiển được trên mạch thật.",
+    "Bộ chạy bài ghi/đọc hai mảng STM32 CPUv1.1 (FC03/06/16, slave 11). Mọi ánh xạ trong stm32_io là GIẢ ĐỊNH để đi dây; chạy bài trên mạch thật chỉ cho bài có mọi ánh xạ \"verified\" (PROGRESS.md mục \"Cần kiểm khi lên phần cứng thật\").",
+    "Bo matrix 2–4 (thanh ghi Matrix2_*…Matrix4_*, index 31–36) cần sửa firmware CPU và firmware bo con (SLAVE_ADDRESS riêng).",
     "registers/wire_signals bên dưới chỉ còn phục vụ chẩn đoán A45 v1 cũ và cấu hình mock."
   ],
   "wire_signals": {
@@ -76,20 +76,25 @@
     "dc_5v_neg": 49
   },
   "stm32_io": {
-    "slave": 9,
-    "note": "Phân bổ theo phiếu xác nhận 2026-11-18 (docs/STM32_MODBUS_PC.md mục 9.10). Mọi mục là \"assumed\" cho tới khi đo kiểm.",
+    "slave": 11,
+    "note": "Giá thử dùng CPUv1.1 For DK_QDT (slave = 8 + công tắc ID = 11), 4 bo RLMatrix 8×4, bo RLMUX 2 kênh × 32, bo RLPW 12 rơ-le; không có bo switch. Bảng đi dây: docs/STM32_MODBUS_PC.md mục 9.10. Mọi mục \"assumed\".",
     "extra_write_registers": {
-      "SW03": 29,
-      "SW04": 30
+      "Matrix2_0": 31,
+      "Matrix2_1": 32,
+      "Matrix3_0": 33,
+      "Matrix3_1": 34,
+      "Matrix4_0": 35,
+      "Matrix4_1": 36
     },
-    "extra_write_note": "ĐỀ XUẤT SỬA FW CPU: mảng mod_buf_to_write có 32 word nên index 29/30 còn trống; CPU cần gửi SW03/SW04 tới bo matrix 2 (ID đề xuất 5) như SW01/SW02. CPUv1.0 hiện chưa làm việc này.",
+    "extra_write_note": "ĐỀ XUẤT SỬA FW CPU (mục 9.9): mảng mod_buf_to_write của CPUv1.1 có 50 word; index 31–36 còn trống. CPU gửi Matrix2_0/1 → bo ID 7, Matrix3_0/1 → ID 8, Matrix4_0/1 → ID 9 (FC16 reg 0–1) mỗi vòng.",
     "mux_register": "MUX",
     "mux_layout": {
       "banks": 2,
       "bank_bits": 8,
+      "channels": 32,
       "idle_channel": 31
     },
-    "mux_note": "Bo MUX 2 kênh × 32 đầu vào; PC ghi SỐ KÊNH 0–31, bo MUX tự tra Mux_Decoder. GIẢ ĐỊNH: byte thấp = MUX1 → ADC3, byte cao = MUX2 (để dành, giữ kênh 31). Kênh 31 (Mux1.32 = 0x0000) = hở hết, dùng làm an toàn.",
+    "mux_note": "Đã đối chiếu firmware RLMUX v1.0: byte thấp = số kênh MUX1, byte cao = MUX2, bo tự tra Mux_Decoder[32]; kênh 31 (Mux1.32 = 0x0000) hở hết. Firmware KHÔNG kiểm giới hạn: kênh ≥ 32 đóng rơ-le ngẫu nhiên, phần mềm chặn (channels = 32). GIẢ ĐỊNH: MUX1 → ADC3; MUX2 để dành.",
     "mux_settle_ms": 20,
     "di_update_ms": 150,
     "di_update_note": "GIẢ ĐỊNH, cần đo (bài tự kiểm tra D02): ACK chỉ là MCU đã chép lệnh vào mod_buf_to_write; DI phản ánh lệnh sau tối đa 2 vòng lặp. Firmware ước tính 50–60 ms/vòng, nên tăng từ 100 lên 150 ms để có dư. Bộ chạy bài chỉ đọc số đo khi đã qua di_update_ms + mux_settle_ms kể từ ACK ghi cuối.",
@@ -103,30 +108,26 @@
     "safe_state": {
       "DAC_val": 0,
       "DOUT": 0,
-      "SW01": 0,
-      "SW02": 0,
       "MUX": 7967,
       "Power": 0,
-      "SW03": 0,
-      "SW04": 0
+      "Matrix0": 0,
+      "Matrix1": 0,
+      "Matrix2_0": 0,
+      "Matrix2_1": 0,
+      "Matrix3_0": 0,
+      "Matrix3_1": 0,
+      "Matrix4_0": 0,
+      "Matrix4_1": 0
     },
-    "safe_state_note": "Mọi rơ-le mở (chân XP1 hở mạch, KT-05/LM-02), MUX về kênh 31 cả hai bank (0x1F1F), DAC_val = 0 (PA4 1,62 V, sau tầng trừ 1,62 V là 0 V).",
+    "safe_state_note": "Mọi rơ-le mở (chân XP1 hở mạch), MUX kênh 31 cả hai bank (0x1F1F), DAC_val = 0 (0 V sau tầng trừ 1,62 V), DOUT = 0. Không ghi SW01/SW02: giá thử không có bo switch.",
     "hmi_forced_bits": {
       "Power": [
         7,
         8,
         9
-      ],
-      "SW01": [
-        12,
-        14
-      ],
-      "SW02": [
-        0,
-        12
       ]
     },
-    "hmi_note": "Bit firmware CPUv1.0 tự bật khi Mode ≠ 1 hoặc sau reset (HMI_processing). Không output nào được dùng các bit này; vì vậy đầu vào 1, 5, 7 của matrix 1 để trống. Power bit 1/2/4/6, SW01 bit 5–7, DOUT bit 5–7 còn bị nút HMI bật/tắt khi Mode ≠ 1 (ghi trong PROGRESS).",
+    "hmi_note": "CPUv1.1 (giống v1.0) khi Mode ≠ 1 hoặc sau reset tự bật Power bit 7–9 → không dùng. Power bit 1/2/4/6 còn bị nút HMI bật/tắt khi Mode ≠ 1. HMI không ghi Matrix[] nên bo matrix giữ trạng thái cuối (0 sau reset).",
     "interlocks": [
       [
         "ac_36v",
@@ -163,16 +164,24 @@
       },
       "PULSE": {
         "value": 4.5,
-        "label": "Xung vuông 10 kHz 4,5 Vpp từ bo tạo xung có sẵn (BT-02)"
+        "label": "Xung vuông 10 kHz 4,5 Vpp từ bo tạo xung có sẵn"
+      },
+      "V27": {
+        "value": 27,
+        "label": "27 V (lệnh 27V-KOM) từ nguồn ngoài có sẵn"
+      },
+      "V5": {
+        "value": 5,
+        "label": "5 V (lệnh CX3) từ nguồn ngoài có sẵn"
       }
     },
     "matrix_boards": [
       {
-        "id": 1,
+        "id": 6,
         "name": "Matrix tín hiệu 1",
         "registers": [
-          "SW01",
-          "SW02"
+          "Matrix0",
+          "Matrix1"
         ],
         "size": {
           "inputs": 8,
@@ -181,10 +190,10 @@
         "layout": "out*8+in",
         "status": "assumed",
         "inputs": {
-          "2": "P3V",
-          "3": "N3V",
-          "4": "DAC",
-          "6": "GND"
+          "1": "P3V",
+          "2": "N3V",
+          "3": "DAC",
+          "4": "GND"
         },
         "outputs": {
           "1": "set_40",
@@ -192,14 +201,14 @@
           "3": "set_42",
           "4": "set_22"
         },
-        "note": "Bo SW (ID 1) có sẵn trong CPUv1.0. GIẢ ĐỊNH bit = (đầu ra−1)×8 + (đầu vào−1). Đầu vào 1/5/7 để trống vì HMI tự bật SW01 bit 12/14, SW02 bit 0/12. Đầu vào 8 còn dư."
+        "note": "Bo RLMatrix ID 6 có sẵn trong firmware CPUv1.1 (Matrix[0..1], index 18–19). GIẢ ĐỊNH rơ-le RL(k+1) = bit k = (đầu ra−1)×8 + (đầu vào−1); firmware chỉ biết bit k → RL(k+1), điểm giao của từng RL nằm trên sơ đồ mạch."
       },
       {
-        "id": 5,
+        "id": 7,
         "name": "Matrix tín hiệu 2",
         "registers": [
-          "SW03",
-          "SW04"
+          "Matrix2_0",
+          "Matrix2_1"
         ],
         "size": {
           "inputs": 8,
@@ -219,7 +228,54 @@
           "3": "set_43",
           "4": "set_44"
         },
-        "note": "CẦN SỬA FW CPU (SW03/SW04 → bo ID 5). Đầu vào 5–8 còn dư. 43/44XP1 dùng chung một nguồn xung (chưa xác nhận)."
+        "note": "CẦN SỬA FIRMWARE: CPU gửi thêm 2 word này tới bo matrix ID 7 (FC16 reg 0–1, như Matrix[0..1] → ID 6); firmware bo RLMatrix phải build với SLAVE_ADDRESS = 7 (hiện cố định 0x06). GIẢ ĐỊNH rơ-le RL(k+1) = bit k = (đầu ra−1)×8 + (đầu vào−1); firmware chỉ biết bit k → RL(k+1), điểm giao của từng RL nằm trên sơ đồ mạch."
+      },
+      {
+        "id": 8,
+        "name": "Matrix tín hiệu 3",
+        "registers": [
+          "Matrix3_0",
+          "Matrix3_1"
+        ],
+        "size": {
+          "inputs": 8,
+          "outputs": 4
+        },
+        "layout": "out*8+in",
+        "status": "assumed",
+        "inputs": {
+          "1": "V27",
+          "2": "GND",
+          "3": "V5"
+        },
+        "outputs": {
+          "1": "set_4",
+          "2": "set_12",
+          "3": "set_13",
+          "4": "set_15"
+        },
+        "note": "CẦN SỬA FIRMWARE: CPU gửi thêm 2 word này tới bo matrix ID 8 (FC16 reg 0–1, như Matrix[0..1] → ID 6); firmware bo RLMatrix phải build với SLAVE_ADDRESS = 8 (hiện cố định 0x06). GIẢ ĐỊNH rơ-le RL(k+1) = bit k = (đầu ra−1)×8 + (đầu vào−1); firmware chỉ biết bit k → RL(k+1), điểm giao của từng RL nằm trên sơ đồ mạch."
+      },
+      {
+        "id": 9,
+        "name": "Matrix tín hiệu 4",
+        "registers": [
+          "Matrix4_0",
+          "Matrix4_1"
+        ],
+        "size": {
+          "inputs": 8,
+          "outputs": 4
+        },
+        "layout": "out*8+in",
+        "status": "assumed",
+        "inputs": {
+          "1": "GND"
+        },
+        "outputs": {
+          "1": "set_23"
+        },
+        "note": "CẦN SỬA FIRMWARE: CPU gửi thêm 2 word này tới bo matrix ID 9 (FC16 reg 0–1, như Matrix[0..1] → ID 6); firmware bo RLMatrix phải build với SLAVE_ADDRESS = 9 (hiện cố định 0x06). GIẢ ĐỊNH rơ-le RL(k+1) = bit k = (đầu ra−1)×8 + (đầu vào−1); firmware chỉ biết bit k → RL(k+1), điểm giao của từng RL nằm trên sơ đồ mạch."
       }
     ],
     "outputs": {
@@ -230,7 +286,7 @@
         "on_value": 1,
         "off_value": 0,
         "status": "assumed",
-        "note": "Bo rơ-le nguồn (12 rơ-le, ID 3): AC 3 pha ~36 V / 1000 Hz (rơ-le 1, NG-02). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "Bo RLPW (ID 3, 12 rơ-le; bit k → RL(k+1)): AC 3 pha ~36 V / 1000 Hz (rơ-le 1, NG-02). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "ac_22v": {
         "kind": "bit",
@@ -239,7 +295,7 @@
         "on_value": 1,
         "off_value": 0,
         "status": "assumed",
-        "note": "Bo rơ-le nguồn (12 rơ-le, ID 3): AC 3 pha ~22 V / 1000 Hz (rơ-le 2, NG-02). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "Bo RLPW (ID 3, 12 rơ-le; bit k → RL(k+1)): AC 3 pha ~22 V / 1000 Hz (rơ-le 2, NG-02). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "dc_27v": {
         "kind": "bit",
@@ -248,7 +304,7 @@
         "on_value": 1,
         "off_value": 0,
         "status": "assumed",
-        "note": "Bo rơ-le nguồn (12 rơ-le, ID 3): +27 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "Bo RLPW (ID 3, 12 rơ-le; bit k → RL(k+1)): +27 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "dc_15v_pos": {
         "kind": "bit",
@@ -257,7 +313,7 @@
         "on_value": 1,
         "off_value": 0,
         "status": "assumed",
-        "note": "Bo rơ-le nguồn (12 rơ-le, ID 3): +15 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "Bo RLPW (ID 3, 12 rơ-le; bit k → RL(k+1)): +15 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "dc_15v_neg": {
         "kind": "bit",
@@ -266,7 +322,7 @@
         "on_value": 1,
         "off_value": 0,
         "status": "assumed",
-        "note": "Bo rơ-le nguồn (12 rơ-le, ID 3): −15 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "Bo RLPW (ID 3, 12 rơ-le; bit k → RL(k+1)): −15 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "dc_12v_pos": {
         "kind": "bit",
@@ -275,7 +331,7 @@
         "on_value": 1,
         "off_value": 0,
         "status": "assumed",
-        "note": "Bo rơ-le nguồn (12 rơ-le, ID 3): +12 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "Bo RLPW (ID 3, 12 rơ-le; bit k → RL(k+1)): +12 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "dc_12v_neg": {
         "kind": "bit",
@@ -284,7 +340,7 @@
         "on_value": 1,
         "off_value": 0,
         "status": "assumed",
-        "note": "Bo rơ-le nguồn (12 rơ-le, ID 3): −12 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "Bo RLPW (ID 3, 12 rơ-le; bit k → RL(k+1)): −12 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "dc_5v_pos": {
         "kind": "bit",
@@ -293,7 +349,7 @@
         "on_value": 1,
         "off_value": 0,
         "status": "assumed",
-        "note": "Bo rơ-le nguồn (12 rơ-le, ID 3): +5 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "Bo RLPW (ID 3, 12 rơ-le; bit k → RL(k+1)): +5 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "dc_5v_neg": {
         "kind": "bit",
@@ -302,47 +358,7 @@
         "on_value": 1,
         "off_value": 0,
         "status": "assumed",
-        "note": "Bo rơ-le nguồn (12 rơ-le, ID 3): −5 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
-      },
-      "set_4": {
-        "kind": "bit",
-        "register": "DOUT",
-        "bit": 0,
-        "on_value": 27,
-        "status": "assumed",
-        "note": "DOUT CPU bit 0: 27V-KOM → 4XP1; cần tầng driver/rơ-le. Không lệnh = hở mạch. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
-      },
-      "set_12": {
-        "kind": "bit",
-        "register": "DOUT",
-        "bit": 1,
-        "on_value": 0,
-        "status": "assumed",
-        "note": "DOUT CPU bit 1: CX4: mức 0 (GND) → 12XP1; cần tầng driver/rơ-le. Không lệnh = hở mạch. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
-      },
-      "set_13": {
-        "kind": "bit",
-        "register": "DOUT",
-        "bit": 2,
-        "on_value": 5,
-        "status": "assumed",
-        "note": "DOUT CPU bit 2: CX3: 5 V → 13XP1; cần tầng driver/rơ-le. Không lệnh = hở mạch. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
-      },
-      "set_15": {
-        "kind": "bit",
-        "register": "DOUT",
-        "bit": 3,
-        "on_value": 0,
-        "status": "assumed",
-        "note": "DOUT CPU bit 3: ОТКЛ ΩI: mức 0 (GND) → 15XP1; cần tầng driver/rơ-le. Không lệnh = hở mạch. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
-      },
-      "set_23": {
-        "kind": "bit",
-        "register": "DOUT",
-        "bit": 4,
-        "on_value": 0,
-        "status": "assumed",
-        "note": "DOUT CPU bit 4: ОТКЛ ΩII: mức 0 (GND) → 23XP1; cần tầng driver/rơ-le. Không lệnh = hở mạch. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "Bo RLPW (ID 3, 12 rơ-le; bit k → RL(k+1)): −5 V. GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       }
     },
     "inputs": {
@@ -402,7 +418,7 @@
         "mux": 0,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "14XP1 → MUX1 kênh 0 (Mux1.1) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "14XP1 → RLMUX ID 2, MUX1 kênh 0 (Mux1.1) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_25": {
         "kind": "adc",
@@ -413,7 +429,7 @@
         "mux": 1,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "25XP1 → MUX1 kênh 1 (Mux1.2) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "25XP1 → RLMUX ID 2, MUX1 kênh 1 (Mux1.2) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_26": {
         "kind": "adc",
@@ -424,7 +440,7 @@
         "mux": 2,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "26XP1 → MUX1 kênh 2 (Mux1.3) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "26XP1 → RLMUX ID 2, MUX1 kênh 2 (Mux1.3) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_29": {
         "kind": "adc",
@@ -435,7 +451,7 @@
         "mux": 3,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "29XP1 → MUX1 kênh 3 (Mux1.4) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "29XP1 → RLMUX ID 2, MUX1 kênh 3 (Mux1.4) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_34": {
         "kind": "adc",
@@ -446,7 +462,7 @@
         "mux": 4,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "34XP1 → MUX1 kênh 4 (Mux1.5) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "34XP1 → RLMUX ID 2, MUX1 kênh 4 (Mux1.5) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_37": {
         "kind": "adc",
@@ -457,7 +473,7 @@
         "mux": 5,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "37XP1 → MUX1 kênh 5 (Mux1.6) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "37XP1 → RLMUX ID 2, MUX1 kênh 5 (Mux1.6) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_48": {
         "kind": "adc",
@@ -468,7 +484,7 @@
         "mux": 6,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "48XP1 → MUX1 kênh 6 (Mux1.7) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "48XP1 → RLMUX ID 2, MUX1 kênh 6 (Mux1.7) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_49": {
         "kind": "adc",
@@ -479,7 +495,7 @@
         "mux": 7,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "49XP1 → MUX1 kênh 7 (Mux1.8) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "49XP1 → RLMUX ID 2, MUX1 kênh 7 (Mux1.8) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_50": {
         "kind": "adc",
@@ -490,7 +506,7 @@
         "mux": 8,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "50XP1 → MUX1 kênh 8 (Mux1.9) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "50XP1 → RLMUX ID 2, MUX1 kênh 8 (Mux1.9) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_51": {
         "kind": "adc",
@@ -501,7 +517,7 @@
         "mux": 9,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "51XP1 → MUX1 kênh 9 (Mux1.10) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "51XP1 → RLMUX ID 2, MUX1 kênh 9 (Mux1.10) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_52": {
         "kind": "adc",
@@ -512,7 +528,7 @@
         "mux": 10,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "52XP1 → MUX1 kênh 10 (Mux1.11) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "52XP1 → RLMUX ID 2, MUX1 kênh 10 (Mux1.11) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_56": {
         "kind": "adc",
@@ -523,7 +539,7 @@
         "mux": 11,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "56XP1 → MUX1 kênh 11 (Mux1.12) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "56XP1 → RLMUX ID 2, MUX1 kênh 11 (Mux1.12) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "xp1_63": {
         "kind": "adc",
@@ -534,7 +550,7 @@
         "mux": 12,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "63XP1 → MUX1 kênh 12 (Mux1.13) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "63XP1 → RLMUX ID 2, MUX1 kênh 12 (Mux1.13) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "ac_current": {
         "kind": "adc",
@@ -545,7 +561,7 @@
         "mux": 13,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "module đo dòng (giả định 1 V/A) → MUX1 kênh 13 (Mux1.14) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "module đo dòng (giả định 1 V/A) → RLMUX ID 2, MUX1 kênh 13 (Mux1.14) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "dc_current": {
         "kind": "adc",
@@ -556,7 +572,7 @@
         "mux": 14,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "module đo dòng (giả định 1 V/A) → MUX1 kênh 14 (Mux1.15) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "module đo dòng (giả định 1 V/A) → RLMUX ID 2, MUX1 kênh 14 (Mux1.15) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "ac_A": {
         "kind": "adc",
@@ -567,7 +583,7 @@
         "mux": 15,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "module đo áp AC ra DC tỉ lệ RMS (giả định 0,1 V/V) → MUX1 kênh 15 (Mux1.16) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "module đo áp AC ra DC tỉ lệ RMS (giả định 0,1 V/V) → RLMUX ID 2, MUX1 kênh 15 (Mux1.16) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "ac_B": {
         "kind": "adc",
@@ -578,7 +594,7 @@
         "mux": 16,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "module đo áp AC ra DC tỉ lệ RMS (giả định 0,1 V/V) → MUX1 kênh 16 (Mux1.17) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "module đo áp AC ra DC tỉ lệ RMS (giả định 0,1 V/V) → RLMUX ID 2, MUX1 kênh 16 (Mux1.17) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       },
       "ac_C": {
         "kind": "adc",
@@ -589,8 +605,9 @@
         "mux": 17,
         "mux_bank": 0,
         "status": "assumed",
-        "note": "module đo áp AC ra DC tỉ lệ RMS (giả định 0,1 V/V) → MUX1 kênh 17 (Mux1.18) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
+        "note": "module đo áp AC ra DC tỉ lệ RMS (giả định 0,1 V/V) → RLMUX ID 2, MUX1 kênh 17 (Mux1.18) → ADC3 (±12 V, raw/100). GIẢ ĐỊNH (phân bổ để đi dây, 2026-11-18), chưa xác minh trên phần cứng."
       }
     }
-  }
+  },
+  "cpu_map": "CPUv1.1"
 }

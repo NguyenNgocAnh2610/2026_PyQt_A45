@@ -11,6 +11,11 @@ from src.common.config import ASSETS_DIR, SERIAL_BAUDRATES
 from src.common.serial import SerialSettings, SERIAL_PARITY
 
 
+
+def _cpu_io(backend):
+    """The stm32 io map (CPU slave) of the profile, or None (mock adapter / test doubles)."""
+    return getattr(getattr(backend, 'device', None), 'io_map', None)
+
 class ConnectionDetails(QDialog):
     """Serial framing and explicit read-only diagnostics; no guessed registers."""
 
@@ -30,7 +35,9 @@ class ConnectionDetails(QDialog):
         scroll.setWidget(content)
         outer.addWidget(scroll)
         hint = QLabel('Mở COM xác nhận máy tính đã mở cổng. Chỉ một phản hồi giao thức hợp lệ '
-                      'mới xác nhận giao dịch với slave. Đọc thử dùng địa chỉ do bạn cung cấp.')
+                      'mới xác nhận giao dịch với slave. Đọc thử (chỉ đọc) dùng địa chỉ do bạn cung cấp, để tìm ID '
+                      'của bo CPU khi không có phản hồi. Trên RS485 của PC chỉ có bo CPU; bo con nằm sau CPU nên đọc '
+                      'ID bo con sẽ không có phản hồi.')
         hint.setWordWrap(True)
         layout.addWidget(hint)
         self.framing_group = QGroupBox('Thông số đường truyền — chỉnh trước khi kết nối')
@@ -203,7 +210,7 @@ class ConnectionBar(QFrame):
             self.baud.addItem(str(value), value)
         self.baud.setAccessibleName('Baudrate')
         row.addWidget(self.baud)
-        self.slave_label = QLabel('ID')
+        self.slave_label = QLabel('ID CPU' if _cpu_io(backend) is not None else 'ID')
         row.addWidget(self.slave_label)
         self.slave = QComboBox()
         self.slave.addItem('—', None)
@@ -322,7 +329,11 @@ class ConnectionBar(QFrame):
         rtu = self.adapter.currentData() == 'rtu'
         self.slave.setVisible(rtu)
         self.slave_label.setVisible(rtu)
-        self.slave.setEnabled(idle and rtu)
+        # stm32 profiles: the device is the CPU at the profile's slave ID, fixed.
+        cpu = _cpu_io(self.backend)
+        self.slave.setEnabled(idle and rtu and cpu is None)
+        if cpu is not None and self.slave.currentData() != cpu.slave:
+            self.slave.setCurrentIndex(self.slave.findData(cpu.slave))
         self.toggle.setEnabled(idle)
         self.toggle.setText('Ngắt' if active or (mock and self.backend.connection != 'Chưa kết nối') else 'Kết nối')
         status = {'Sẵn sàng · MÔ PHỎNG': 'Đã nối · Demo',

@@ -3,8 +3,10 @@
 Phần mềm giao diện và điều hành giá thử bằng Python + PySide6 (Qt Widgets + QML),
 dùng chung cho nhiều giá thử thông qua **profile JSON**. Cấu hình đầu tiên là
 **A45 / khối 1101K-10** (24 tham số). PC là Modbus RTU Master điều khiển một
-STM32 CPUv1.0 (Slave). Hiện bộ chạy bài chỉ chạy trên cổng COM ảo (STM32 giả lập, khung
-Modbus RTU thật); chưa thử mạch thật.
+STM32 **CPUv1.1** (Slave 11); CPU điều khiển tiếp các bo matrix rơ-le, MUX và rơ-le nguồn.
+Bộ chạy bài chạy trên COM ảo (STM32 giả lập, khung Modbus RTU thật) và trên COM thật có
+kiểm soát (tự kiểm tra ngay; bài đo khi ánh xạ đã đo kiểm). Có trang **Test Modbus** để
+kiểm từng rơ-le/kênh.
 
 ## Tài liệu
 
@@ -12,6 +14,7 @@ Modbus RTU thật); chưa thử mạch thật.
 |---|---|
 | [AGENTS.md](AGENTS.md) | Quy tắc phát triển bắt buộc (kiến trúc, an toàn giao tiếp, backup, quy trình) |
 | [PROGRESS.md](PROGRESS.md) | Hiện trạng, việc tiếp theo, vấn đề mở — nhật ký duy nhất |
+| [docs/LUONG_CODE_VA_MODBUS.md](docs/LUONG_CODE_VA_MODBUS.md) | Luồng code tổng; hàm truyền/nhận Modbus; cách đặt log, debug, tùy biến khung |
 | [docs/STM32_MODBUS_PC.md](docs/STM32_MODBUS_PC.md) | Giao tiếp Modbus RTU với STM32: hai mảng, quy tắc giao dịch, bộ chạy bài, simulator |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Tham chiếu schema profile JSON |
 | [docs/CHUYEN_GIA_THU_MOI.md](docs/CHUYEN_GIA_THU_MOI.md) | Quy trình chuyển sang giá thử mới |
@@ -43,9 +46,25 @@ Nếu shell không activate được, dùng `conda run -n qt_env python ...`.
 - **Mô phỏng** → Kết nối: mở **COM ảo** tới STM32 giả lập, chỉ đọc FC03 để xác nhận, không ghi.
   Mọi giao dịch đi qua đúng đường code của COM thật, với khung Modbus RTU, CRC, timeout và độ trễ
   vòng lặp MCU. Khi có lỗi (timeout, mất cáp), COM ảo tự đóng như cổng thật, nên phải Kết nối lại.
-- **Modbus RTU / UART** → chọn COM, baudrate → Kết nối: mở COM thật cho **chẩn đoán**
-  (đọc một lần, màn hình Hai mảng STM32). Hướng dẫn và quy tắc: [STM32_MODBUS_PC.md mục 6](docs/STM32_MODBUS_PC.md#6-sử-dụng-trên-giao-diện-chẩn-đoán).
+- **Modbus RTU** → chọn COM, baudrate → Kết nối: mở COM thật, phần mềm tự đọc một FC03 tới
+  CPU (slave theo profile, A45 = 11). Có trả lời → **"Sẵn sàng · COM THẬT"**; không trả lời →
+  "Không có phản hồi STM32 (slave N)" kèm gợi ý (công tắc ID trên bo CPU, dây A/B, baud).
+  **UART** chỉ mở cổng serial thuần. Hướng dẫn: [STM32_MODBUS_PC.md mục 6](docs/STM32_MODBUS_PC.md#6-sử-dụng-trên-giao-diện-chẩn-đoán).
 - "Đã mở COM" chỉ là đã mở cổng, chưa xác nhận slave trả lời.
+
+### Chạy trên mạch thật
+- **Tự kiểm tra giá thử** (D01 truyền thông, D02 chu kỳ vòng lặp CPU): chạy được ngay khi
+  "Sẵn sàng · COM THẬT", sau hộp thoại xác nhận; chỉ ghi trạng thái an toàn (mọi rơ-le nhả).
+- **Bài đo** chỉ chạy khi mọi ánh xạ bài dùng đã `verified` trong `hardware.json`, D02 đạt
+  trên kết nối đó, và người vận hành xác nhận. Thiếu điều kiện nào thì hộp thoại liệt kê rõ.
+  Thời gian chờ trên mạch thật không bị chia hệ số mô phỏng. Chi tiết: [STM32_MODBUS_PC.md mục 10](docs/STM32_MODBUS_PC.md).
+
+### Test Modbus
+Mục **⇄ Test Modbus** trên thanh bên: lấy quyền điều khiển CPU (Mode=1), bật/tắt từng rơ-le
+nguồn, nối chân qua lưới matrix 8×4 của từng bo, chọn kênh MUX rồi đọc ADC, đặt DAC/DOUT,
+nút **Về an toàn**, bảng thanh ghi thô (tự đọc định kỳ) và nhật ký khung TX/RX xuất ra file.
+Dùng chung luật an toàn với bộ chạy bài (liên động, ngắt trước đóng sau, chặn kênh MUX ≥ 32).
+Thử trước trên COM ảo. Chi tiết: [STM32_MODBUS_PC.md mục 6.1](docs/STM32_MODBUS_PC.md).
 
 ### Chạy bài
 1. Nhập serial khối (không cần với tự kiểm tra), chọn chế độ: **Tự kiểm tra giá thử**,

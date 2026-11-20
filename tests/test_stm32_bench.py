@@ -1,8 +1,10 @@
 """Test runner over the two CPUv1.0 banks: mapping, validation, simulator, runner.
 
 No serial port is opened; the register-level simulator stands in for the MCU.
-The I/O map under test is the ASSUMED wiring allocation in configs/a45
-(signal-relay matrix boards, DOUT, 12-relay power board, MUX channel numbers).
+The I/O map under test is the ASSUMED wiring allocation in configs/a45 for
+CPUv1.1 (slave 11): four RLMatrix boards (board 1 on Matrix[0..1] = DO 18–19,
+boards 2–4 on proposed firmware registers 31–36), RLPW power board, RLMUX
+channel numbers.
 """
 import tempfile
 import time
@@ -16,7 +18,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from src.backend import Backend, evaluate
-from src.common.profiles import ProfileError, load_profile, validate_profile
+from src.common.profiles import ProfileError, load_profile, validate_profile, stm32_io_map
 from src.common.stm32 import ReadRegister as RI, WriteRegister as WO
 from src.common.testing import Mode, Sample
 from src.protocol import Stm32IoMap, UnsupportedSignal, decode_int16, encode_int16
@@ -25,18 +27,21 @@ from src.simulator import Stm32Simulator
 DC = ('dc_27v', 'dc_15v_pos', 'dc_15v_neg', 'dc_12v_pos', 'dc_12v_neg', 'dc_5v_pos', 'dc_5v_neg')
 POWER_ALL = [{'signal': s, 'value': 1} for s in ('ac_22v',) + DC]
 DC_BITS = 1 << 2 | 1 << 3 | 1 << 4 | 1 << 5 | 1 << 6 | 1 << 10 | 1 << 11
-SW03 = 29
+MATRIX0, MATRIX1 = 18, 19   # CPUv1.1 Matrix[0..1] → RLMatrix ID 6.
+MATRIX2 = 31                # Proposed firmware registers Matrix2_0/1 (board 2).
 MUX_IDLE = 31 << 8 | 31
+# Never written by the runner on CPUv1.1: Null, encoder DataO1/DataO2, SSI DataO3, CDT (20), DataT (21–30).
+FORBIDDEN = {0, 13, 14, 15} | set(range(20, 31))
 
 
 def io_map(profile=None):
-    return Stm32IoMap((profile or load_profile()).hardware['stm32_io'])
+    return stm32_io_map(profile or load_profile())
 
 
 def without_board_2():
     profile = deepcopy(load_profile())
     board = profile.hardware['stm32_io']['matrix_boards'][1]
-    board.update(status='unsupported', reason='Firmware CPU chưa gửi SW03/SW04 tới bo matrix 2.')
+    board.update(status='unsupported', reason='Firmware CPU chưa gửi Matrix2_0/1 tới bo matrix 2.')
     validate_profile(profile)
     return profile
 
@@ -48,19 +53,23 @@ class Stm32IoMapTests(unittest.TestCase):
         image = io.apply(safe, [{'signal': 'dc_27v', 'value': 1}, {'signal': 'set_40', 'value': 3}])
         self.assertEqual(image[WO.Mode], 1)
         self.assertEqual(image[WO.Power], 1 << 2)
-        self.assertEqual(image[WO.SW01], 1 << 1)  # Matrix 1: output 1 (40XP1) ← input 2 (+3 V).
+        self.assertEqual(image[MATRIX0], 1 << 0)  # Matrix 1: output 1 (40XP1) ← input 1 (+3 V) = RL1.
         self.assertEqual(io.inverse(image), {'dc_27v': 1, 'set_40': 3})
         flipped = io.apply(image, [{'signal': 'set_40', 'value': -3}])
-        self.assertEqual(flipped[WO.SW01], 1 << 2)  # +3 V contact released, −3 V closed.
+        self.assertEqual(flipped[MATRIX0], 1 << 1)  # +3 V contact released, −3 V closed.
         released = io.apply(image, [{'signal': 'set_40', 'value': None}])
-        self.assertEqual(released[WO.SW01], 0)  # Open circuit.
+        self.assertEqual(released[MATRIX0], 0)  # Open circuit.
         small = io.apply(safe, [{'signal': 'set_40', 'value': 0.5}])
-        self.assertEqual(small[WO.SW01], 1 << 3)  # DAC input.
+        self.assertEqual(small[MATRIX0], 1 << 2)  # DAC input.
         self.assertEqual(decode_int16(small[WO.DAC_val]), -323)  # −1.55 mV per code.
         self.assertAlmostEqual(io.inverse(small)['set_40'], 0.5, delta=0.00155 / 2)
         board_2 = io.apply(safe, [{'signal': 'set_43', 'value': 4.5}, {'signal': 'set_44', 'value': 4.5}])
-        self.assertEqual(board_2[SW03 + 1], 1 << 3 | 1 << 11)  # SW04: pulse input on outputs 3 and 4.
-        bad = [[{'signal': 'set_4', 'value': 5}],                       # DOUT contact only supplies 27 V.
+        self.assertEqual(board_2[MATRIX2 + 1], 1 << 3 | 1 << 11)  # Matrix2_1: pulse input on outputs 3 and 4.
+        logic = io.apply(safe, [{'signal': 'set_4', 'value': 27}, {'signal': 'set_13', 'value': 5}])
+        self.assertEqual(logic[33], 1 << 0)   # Matrix3_0: 4XP1 ← 27 V (RL1 of board ID 8).
+        self.assertEqual(logic[34], 1 << 2)   # Matrix3_1: 13XP1 ← 5 V.
+        self.assertEqual(logic[WO.DOUT], 0)   # Level commands no longer need DOUT drivers.
+        bad = [[{'signal': 'set_4', 'value': 12}],                      # 4XP1: only 27 V / GND / 5 V sources.
                [{'signal': 'set_40', 'value': 5}],                      # No source and outside the DAC range.
                [{'signal': 'set_32', 'value': 0.5}],                    # Matrix 2 has no DAC input.
                [{'signal': 'set_40', 'value': 0.5}, {'signal': 'set_41', 'value': -0.6}],  # One DAC.
@@ -70,25 +79,28 @@ class Stm32IoMapTests(unittest.TestCase):
             with self.subTest(actions=actions), self.assertRaises(ValueError):
                 io.apply(safe, actions)
         grounded = io.apply(safe, [{'signal': f'set_{p}', 'value': 0} for p in (40, 41, 42)])
-        self.assertEqual((grounded[WO.SW01], grounded[WO.SW02]), (1 << 5 | 1 << 13, 1 << 5))
+        self.assertEqual((grounded[MATRIX0], grounded[MATRIX1]), (1 << 3 | 1 << 11, 1 << 3))
         powered = io.apply(safe, [{'signal': 'ac_36v', 'value': 1}])
         self.assertEqual(io.apply(powered, [{'signal': 'ac_36v', 'value': 0}])[WO.Power], 0)  # off_value.
         unsupported = io_map(without_board_2())
         with self.assertRaises(UnsupportedSignal):
             unsupported.apply(unsupported.safe_image(), [{'signal': 'set_43', 'value': 4.5}])
 
-    def test_hmi_forced_bits_are_never_used(self):
+    def test_hmi_forced_bits_and_switch_board_are_never_used(self):
         io = io_map()
-        forced = {('Power', b) for b in (7, 8, 9)} | {('SW01', 12), ('SW01', 14), ('SW02', 0), ('SW02', 12)}
+        forced = {('Power', b) for b in (7, 8, 9)}
         used = {point for entry in io.outputs.values() for point in io.points(entry)}
         self.assertFalse(used & forced)
+        self.assertFalse({r for r, _ in used} & {'SW01', 'SW02', 'DOUT'})  # No switch board, no DOUT driver.
+        self.assertEqual(io.cpu_map.name, 'CPUv1.1')
+        self.assertEqual(io.slave, 11)
 
     def test_break_before_make_phases(self):
         io = io_map()
         plus = io.apply(io.safe_image(), POWER_ALL + [{'signal': 'set_40', 'value': 3}])
         minus = io.apply(plus, [{'signal': 'set_40', 'value': -3}])
         opened, final = io.phases(plus, minus)
-        self.assertEqual((opened[WO.SW01], final[WO.SW01]), (0, 1 << 2))
+        self.assertEqual((opened[MATRIX0], final[MATRIX0]), (0, 1 << 1))
         self.assertEqual(opened[WO.Power], plus[WO.Power])  # Only the released contact opens.
         self.assertEqual(io.phases(io.safe_image(), plus), [plus])  # Only closing: one phase.
         self.assertEqual(io.phases(plus, io.safe_image()), [io.safe_image()])  # Only opening.
@@ -100,12 +112,12 @@ class Stm32IoMapTests(unittest.TestCase):
         io = io_map()
         safe = io.safe_image()
         full = io.writes(None, safe)
-        self.assertEqual(full, [(1, [1, 2]), (7, [0, 0, 0, 0, MUX_IDLE, 0]), (SW03, [0, 0])])
+        self.assertEqual(full, [(1, [1, 2]), (7, [0, 0]), (11, [MUX_IDLE, 0]), (18, [0, 0]), (31, [0] * 6)])
         powered = io.apply(safe, [{'signal': 'dc_27v', 'value': 1}])
         self.assertEqual(io.writes(safe, powered), [(WO.Power, [4])])
         self.assertEqual(io.writes(powered, powered), [])
         touched = {a + i for a, words in full for i in range(len(words))}
-        self.assertFalse(touched & {WO.Null, WO.DataO1, WO.DataO2, WO.DataO3, WO.CDT})
+        self.assertFalse(touched & FORBIDDEN)
 
     def test_decode_signed_scale_link_and_mux_channel_groups(self):
         io = io_map()
@@ -143,12 +155,17 @@ class Stm32ProfileValidationTests(unittest.TestCase):
         def io(p):
             return p.hardware['stm32_io']
         mutations = [
-            lambda p: io(p)['outputs']['set_4'].update(register='DataO1'),           # Encoder command.
-            lambda p: io(p)['outputs']['set_12'].update(bit=0),                      # Same bit as set_4.
-            lambda p: io(p)['outputs']['set_15'].update(register='Power', bit=7),    # Forced on by the HMI code.
-            lambda p: io(p)['matrix_boards'][0]['inputs'].update({'1': 'P3V'}),      # SW02.bit0 forced on.
+            lambda p: p.hardware.update(cpu_map='CPUv9'),
+            lambda p: io(p)['outputs']['dc_27v'].update(register='DataO1'),          # Encoder command.
+            lambda p: io(p)['outputs']['dc_15v_pos'].update(bit=2),                  # Same bit as dc_27v.
+            lambda p: io(p)['outputs']['ac_36v'].update(bit=7),                      # Forced on by the HMI code.
+            lambda p: io(p)['safe_state'].update(CDT=0),                             # CDT is not runner-writable.
+            lambda p: io(p)['matrix_boards'][0]['outputs'].update({'2': 'set_40'}),  # Pin twice on one board.
             lambda p: io(p)['matrix_boards'][1]['outputs'].update({'1': 'set_40'}),  # Pin on two boards.
-            lambda p: io(p)['extra_write_registers'].update(SW03=28),                # Inside CPUv1.0 map.
+            lambda p: io(p)['extra_write_registers'].update(Matrix2_0=20),           # Inside the CPUv1.1 map (CDT).
+            lambda p: io(p)['extra_write_registers'].update(CDT=40),                 # Existing register name.
+            lambda p: io(p)['extra_write_registers'].update(Matrix2_0=50),           # Beyond the 50-word array.
+            lambda p: io(p)['inputs']['xp1_49'].update(mux=40),                      # RLMUX has 32 channels.
             lambda p: io(p)['session'].update(Mode=0),
             lambda p: io(p)['safe_state'].update(MUX=0),                             # Selects Mux1.1.
             lambda p: io(p)['inputs'].pop('xp1_50'),
@@ -188,11 +205,11 @@ class Stm32SimulatorTests(unittest.TestCase):
         self.write_image(io, sim, image)
         self.assertEqual(decode_int16(sim.read(9)[RI.ADC3_val - 1]), 850)
         wrong = dict(image)
-        wrong[WO.SW01] = 1 << 9  # Stimulus lands on 41XP1 instead.
+        wrong[MATRIX0] = 1 << 8  # Stimulus lands on 41XP1 instead.
         self.write_image(io, sim, wrong)
         self.assertEqual(decode_int16(sim.read(9)[RI.ADC3_val - 1]), 0)
         shorted = dict(image)
-        shorted[WO.SW01] = 1 << 1 | 1 << 2  # +3 V and −3 V on one pin.
+        shorted[MATRIX0] = 1 << 0 | 1 << 1  # +3 V and −3 V on one pin.
         self.write_image(io, sim, shorted)
         self.assertIsNone(sim.stimuli()['set_40'])
         self.assertEqual(decode_int16(sim.read(9)[RI.ADC3_val - 1]), 0)
@@ -228,10 +245,10 @@ class Stm32SimulatorTests(unittest.TestCase):
 
     def test_extension_registers_exist_only_with_the_profile_map(self):
         io, sim = self.simulator()
-        sim.write(9, SW03, [1, 2])
-        self.assertEqual(sim.mod_buf_to_write[SW03:SW03 + 2], [1, 2])
+        sim.write(9, MATRIX2, [1, 2])
+        self.assertEqual(sim.mod_buf_to_write[MATRIX2:MATRIX2 + 2], [1, 2])
         with self.assertRaises(ValueError):
-            Stm32Simulator().write(9, SW03, [1])
+            Stm32Simulator().write(9, MATRIX2, [1])  # CPUv1.0 without the profile's proposed registers.
 
 
 class EvaluateTests(unittest.TestCase):
@@ -314,13 +331,15 @@ class Stm32RunnerTests(unittest.TestCase):
         self.assertEqual((m['signal'], m['value'], m['status']), ('dc_current', 1.37, 'PASS'))
         sent = self.sent()
         self.assertEqual(sent[0], (WO.Mode, [1, 2]))                       # Mode=1 before anything else.
-        self.assertEqual(sent[1], (WO.DAC_val, [0, 0, 0, 0, MUX_IDLE, 0]))  # Known all-off state.
-        self.assertEqual(sent[2], (SW03, [0, 0]))                          # Matrix 2 (proposed FW registers).
-        self.assertEqual(sent[3], (WO.Power, [DC_BITS]))                   # One relay per DC pole, no AC.
-        self.assertEqual(sent[4], (WO.MUX, [31 << 8 | 14]))                # MUX1 channel 14: dc_current.
+        self.assertEqual(sent[1], (WO.DAC_val, [0, 0]))                    # Known all-off state…
+        self.assertEqual(sent[2], (WO.MUX, [MUX_IDLE, 0]))
+        self.assertEqual(sent[3], (MATRIX0, [0, 0]))                       # Matrix board ID 6.
+        self.assertEqual(sent[4], (MATRIX2, [0] * 6))                      # Boards 7–9 (proposed FW registers).
+        self.assertEqual(sent[5], (WO.Power, [DC_BITS]))                   # One relay per DC pole, no AC.
+        self.assertEqual(sent[6], (WO.MUX, [31 << 8 | 14]))                # MUX1 channel 14: dc_current.
         self.assertEqual(sent[-1], (WO.MUX, [MUX_IDLE, 0]))                # MUX idle and Power off.
         touched = {a + i for a, words in sent for i in range(len(words))}
-        self.assertFalse(touched & {WO.Null, WO.DataO1, WO.DataO2, WO.DataO3, WO.CDT})
+        self.assertFalse(touched & FORBIDDEN)
         self.assertTrue(b.attempt['cleanup_confirmed'])
         notes = {t['note'] for t in b.attempt['transactions']}
         self.assertEqual(len(notes), 1)
@@ -340,7 +359,7 @@ class Stm32RunnerTests(unittest.TestCase):
         b = self.backend(without_board_2(), test='P10')
         self.run_done(b)
         self.assertEqual(b.attempt['status'], 'BLOCKED')
-        self.assertIn('SW03/SW04', b.attempt['reason'])
+        self.assertIn('Matrix2_0/1', b.attempt['reason'])
         self.assertEqual(self.writes, [])
 
     def test_fail_scenario_gives_fail_not_pass(self):
@@ -415,7 +434,7 @@ class Stm32RunnerTests(unittest.TestCase):
             self.assertEqual(b.session['verdict'], 'ERROR')
             self.assertFalse(b.attempt['cleanup_confirmed'])
             stimulus = [c for c in sent.call_args_list
-                        if c.args[0] == 'write' and c.args[3] == WO.SW01 and c.args[4][0] != 0]
+                        if c.args[0] == 'write' and c.args[3] == MATRIX0 and c.args[4][0] != 0]
             self.assertEqual(len(stimulus), 1)  # The unanswered stimulus write, never resent.
             self.assertEqual(b.device.bench_image, {})  # Output state is now unknown.
             count = sent.call_count

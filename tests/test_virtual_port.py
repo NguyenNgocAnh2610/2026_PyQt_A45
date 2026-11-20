@@ -13,7 +13,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from src.backend import Backend
-from src.common.profiles import ProfileError, load_profile, validate_profile
+from src.common.profiles import ProfileError, load_profile, validate_profile, stm32_io_map
 from src.common.stm32 import ReadRegister as RI, WriteRegister as WO
 from src.common.testing import Mode
 from src.protocol import Stm32IoMap, crc16_modbus, rtu_adu, rtu_request_pdu, split_rtu_adu
@@ -94,7 +94,7 @@ class Stm32RtuSlaveTests(unittest.TestCase):
 class CpuLoopLatencyTests(unittest.TestCase):
     def test_di_shows_a_new_mux_channel_only_after_the_main_loop_ran_it(self):
         p = load_profile()
-        io = Stm32IoMap(p.hardware['stm32_io'])
+        io = stm32_io_map(p)
         now = [10.0]
         sim = Stm32Simulator(io_map=io, cases=p.fixtures['stm32_cases'], clock=lambda: now[0], loop_ms=50)
         image = io.apply(io.safe_image(), POWER_DC)
@@ -238,8 +238,8 @@ class RunnerOverVirtualPortTests(unittest.TestCase):
         self.assertEqual(b.session['verdict'], 'PASS')
         self.assertGreater(b.device.virtual_line.frames, 5)
         frames = b.stm32.frames[True]
-        self.assertEqual(frames['TX'][:4], bytes([9, 16, 0, WO.MUX]))  # Last write: MUX idle + Power off (FC16).
-        self.assertEqual(split_rtu_adu(frames['RX'])[0], 9)
+        self.assertEqual(frames['TX'][:4], bytes([11, 16, 0, WO.MUX]))  # Slave 11; last write: MUX idle + Power off.
+        self.assertEqual(split_rtu_adu(frames['RX'])[0], 11)
 
     def test_too_short_wait_after_mux_reads_the_old_channel_and_fails(self):
         profile = deepcopy(load_profile())
