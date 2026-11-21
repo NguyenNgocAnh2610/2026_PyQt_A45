@@ -10,7 +10,8 @@ hiện trạng, quyết định, việc tiếp theo và lịch sử.
 - Phần cứng thật (người dùng xác nhận 2026-11-19): CPU **CPUv1.1 For DK_QDT** (slave **11** = 8 + công tắc ID, đã đọc
   được bằng "Đọc thử Modbus"), 4 bo RLMatrix 8×4, 4 bo RLMUX 2×32 (A45 cần 1), 1 bo RLPW 12 rơ-le, mạch đo dòng; không
   có bo switch. Chưa đi dây. Firmware: `D:\project\2026_DT_Chinh\ref\ref_AHung\A34_Phao37\Program\`.
-  Giao tiếp: `docs/STM32_MODBUS_PC.md` (mục 3.1 bản đồ CPUv1.1, 9.9 đề xuất sửa firmware, 9.10 bảng đi dây).
+  Tài liệu: `docs/README.md` (mục lục). Bản đồ CPUv1.1: `docs/02_GIAO_THUC_MODBUS.md` mục 3.1; đề xuất sửa firmware và
+  bảng đi dây: `docs/04_FIRMWARE_VA_PHAN_CUNG.md` mục 9, 10.
 - Mục "Cần kiểm khi lên phần cứng thật" bên dưới là danh sách điểm giả định phải kiểm khi đi dây/chạy mạch.
 - Người dùng cho phép dùng skill `multi-agent-orchestrator` cho cả việc code và ngoài code.
 
@@ -40,10 +41,10 @@ hiện trạng, quyết định, việc tiếp theo và lịch sử.
   phần cứng chưa đi dây; firmware chưa sửa cho bo matrix 2–4; chưa chạy tự kiểm tra/bài đo nào trên mạch thật
   (`production_ready=false`).
 - Adapter `mock` + giao thức A45 v1 cũ chỉ còn cho cấu hình thứ hai trong test và
-  chẩn đoán cũ (phụ lục A `docs/STM32_MODBUS_PC.md`).
+  chẩn đoán cũ (phụ lục A `docs/02_GIAO_THUC_MODBUS.md`).
 
 ## Đang làm
-- 2026-11-19: báo cáo rà soát trước khi chạy thật `docs/RA_SOAT_TRUOC_CHAY_THAT.md` (tạm, chờ người dùng trả lời mục 9;
+- 2026-11-19: báo cáo rà soát trước khi chạy thật `docs/bao_cao/2026-11-19_RA_SOAT_TRUOC_CHAY_THAT.md` (tạm, chờ người dùng trả lời mục 9;
   chưa sửa mã). Phát hiện chính:
   - 4 RLMatrix cùng ID 6, 4 RLMUX cùng ID 2 (cố định trong firmware) → chỉ cắm 1 bo mỗi loại; firmware giữ nguyên chạy
     được 15/24 bài;
@@ -52,14 +53,14 @@ hiện trạng, quyết định, việc tiếp theo và lịch sử.
 
 ## Cần kiểm khi lên phần cứng thật
 Ánh xạ trong `configs/a45/hardware.json` → `stm32_io` là **bảng phân bổ để đi dây** (cập nhật 2026-11-19 cho CPUv1.1 + 4 bo
-matrix; bảng ở `docs/STM32_MODBUS_PC.md` mục 9.10). Mọi mục `assumed`. Kiểm từng điểm bằng trang **Test Modbus** + đồng hồ,
+matrix; bảng ở `docs/04_FIRMWARE_VA_PHAN_CUNG.md` mục 10). Mọi mục `assumed`. Kiểm từng điểm bằng trang **Test Modbus** + đồng hồ,
 đạt thì đổi `verified` (bài đo trên mạch thật chỉ chạy khi mọi mục nó dùng đã `verified`).
 
 Ngay khi nối mạch
 1. Chạy **Tự kiểm tra** trên COM thật: D01 phải PASS; D02 cho chu kỳ vòng lặp CPU. CPUv1.1 mỗi vòng vẫn gửi 1 khung tới
    HMI ID 4 và 2 khung tới bo switch ID 1 (đều không lắp), mỗi khung chờ hết `t_timeout` 100 ms → ước tính **≈ 360–380
-   ms/vòng** (bảng ở STM32_MODBUS_PC mục 9.2; ước tính cũ 250–350 ms là thiếu) > ngưỡng 75 ms → D02 FAIL, bài đo bị chặn
-   cho tới khi sửa firmware (mục 9.9 bước 3, còn ≈ 60–70 ms) hoặc nâng `di_update_ms`/`break_ms`/ngưỡng D02 theo số đo.
+   ms/vòng** (bảng ở 04_FIRMWARE_VA_PHAN_CUNG mục 2; ước tính cũ 250–350 ms là thiếu) > ngưỡng 75 ms → D02 FAIL, bài đo bị chặn
+   cho tới khi sửa firmware (`04_FIRMWARE_VA_PHAN_CUNG` mục 9 bước 3, còn ≈ 60–70 ms) hoặc nâng `di_update_ms`/`break_ms`/ngưỡng D02 theo số đo.
 
 Bo matrix
 2. Rơ-le RL(k+1) nối đầu vào nào với đầu ra nào (firmware chỉ biết bit k → RL k+1; giả định k = (ra−1)×8 + (vào−1)).
@@ -84,7 +85,7 @@ Kích thích
 Nguồn
 9. `Power` bit 1/2/4/6 (AC 22 V, +27, −15, −12 V) bị nút HMI bật/tắt khi `Mode ≠ 1`; bit 7–9 để trống vì bị ép bật.
 
-Firmware (người dùng cho phép sửa, chưa sửa; đề xuất cụ thể ở STM32_MODBUS_PC mục 9.9)
+Firmware (người dùng cho phép sửa, chưa sửa; đề xuất cụ thể ở 04_FIRMWARE_VA_PHAN_CUNG mục 9)
 10. - Slave ID riêng cho từng bo con; CPU gửi bo matrix 2–4; bỏ gửi tới bo switch/HMI không lắp.
     - FW-03: reset/`Mode ≠ 1` → HMI tự bật VDD1–3; PC không phát hiện được MCU reset.
     - FW-04: `Error_M` (lỗi bo con) không báo lên PC; ACK không chứng minh rơ-le đã đóng.
@@ -99,8 +100,8 @@ Bài kiểm tra (giá trị tạm do người dùng chỉ định 2026-11-18, gh
 
 ## Tiếp theo
 - Người dùng: mở COM thật → "Sẵn sàng · COM THẬT" → chạy Tự kiểm tra (D01/D02), gửi lại chu kỳ D02 đo được.
-- Sửa firmware theo `docs/STM32_MODBUS_PC.md` mục 9.9 (slave ID bo con, bo matrix 2–4, bỏ gửi bo vắng); chạy lại D02.
-- Đi dây theo mục 9.10; kiểm từng rơ-le/điểm giao/kênh bằng Test Modbus; đo bảng DAC; đổi `verified` từng mục.
+- Sửa firmware theo `docs/04_FIRMWARE_VA_PHAN_CUNG.md` mục 9 (slave ID bo con, bo matrix 2–4, bỏ gửi bo vắng); chạy lại D02.
+- Đi dây theo `docs/04_FIRMWARE_VA_PHAN_CUNG.md` mục 10; kiểm từng rơ-le/điểm giao/kênh bằng Test Modbus; đo bảng DAC; đổi `verified` từng mục.
 - Xác nhận dấu P22–P24 và các dung sai tạm. Bổ sung bài tự kiểm tra (D03 ADC…) khi người dùng yêu cầu.
 
 ## Vấn đề còn mở
@@ -120,8 +121,8 @@ Bài kiểm tra (giá trị tạm do người dùng chỉ định 2026-11-18, gh
 - `tests/preview_main.py --scenario` vẫn liệt kê `stale`/`protection`; với adapter stm32 backend sẽ từ chối.
 - Khi đang tạm dừng, màn hình chẩn đoán hai mảng vẫn bị khóa (backend coi là đang bận).
 - Nút "Tạm dừng" của đồ thị demo trùng tên với nút Tạm dừng quy trình; cân nhắc đổi tên.
-- Ví dụ CRC trong `docs/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md` sai (giữ nguyên file nguồn).
-  - Khung đúng ghi ở `docs/STM32_MODBUS_PC.md` mục 11.
+- Ví dụ CRC trong `docs/nguon/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md` sai (giữ nguyên file nguồn).
+  - Khung đúng ghi ở `docs/02_GIAO_THUC_MODBUS.md` mục 6.
   - Thêm: FC03 bo HMI `04 03 00 00 00 05` có CRC đúng là `85 9C`, không phải `84 5C`.
 - Hai backend cùng một thư mục lưu có thể xung đột ghi (Windows "Access is denied") khi
   phiên còn đang lưu; thực tế chỉ chạy một ứng dụng, test đã tách cho đúng cách dùng.
@@ -178,6 +179,21 @@ Bài kiểm tra (giá trị tạm do người dùng chỉ định 2026-11-18, gh
   **120/120**; preview màn hình chính đã xem. Chưa thử trên mạch thật.
 
 ## Lịch sử ngắn
+- 2026-11-21: tổ chức lại `docs/` (chỉ tài liệu; backup `.backup/GUI_2026-11-21_09-00-34_UTC+07_before-docs-reorg.zip`,
+  958 file, kiểm tra OK).
+  - Mục lục chung `docs/README.md` (danh sách, thứ tự đọc theo vai trò, quy ước tên/tham chiếu/mục lục). Mỗi file có
+    `## Mục lục`.
+  - `STM32_MODBUS_PC.md` + `LUONG_CODE_VA_MODBUS.md` tách/gom thành `01_KIEN_TRUC_PHAN_MEM`, `02_GIAO_THUC_MODBUS`,
+    `03_LUONG_MODBUS_TRONG_CODE`, `04_FIRMWARE_VA_PHAN_CUNG`, `05_VAN_HANH_GIAO_DIEN`; bỏ phần trùng (sơ đồ tầng, mô tả kiểu
+    output/input đã có ở schema, mô tả COM ảo hai nơi). `CONFIGURATION.md` → `06_CAU_HINH_PROFILE.md`,
+    `CHUYEN_GIA_THU_MOI.md` → `07_CHUYEN_GIA_THU_MOI.md`; tài liệu nguồn → `docs/nguon/` (nội dung giữ nguyên); báo cáo rà
+    soát → `docs/bao_cao/2026-11-19_RA_SOAT_TRUOC_CHAY_THAT.md`.
+  - Bảng đổi số mục cũ `STM32_MODBUS_PC` → mới: 1–4 → 02 (giữ số), 5.1 → 02 mục 5, 11 → 02 mục 6, 5.2 → 01 mục 8,
+    6/6.1/10 → 05 mục 1/2/3, 7 → 03 mục 4, 8 → 03 mục 7, 12 → 03 mục 16, 9.N → 04 mục N. Các mục lịch sử bên dưới vẫn ghi
+    tên/số mục cũ.
+  - Sửa chỗ lỗi thời: ví dụ khung A45 (slave 11, CRC tính lại), kích thước mảng CPUv1.1, ô CPU slave cố định, hàng "bản đồ
+    thanh ghi khác" trong 07. Cập nhật tham chiếu ở AGENTS, CLAUDE, README, `hardware.json` (ghi chú), một comment test.
+  - Kiểm: script kiểm liên kết/anchor 0 lỗi; `unittest discover` **163/163**.
 - 2026-11-19 khuya: thêm tài liệu `docs/LUONG_CODE_VA_MODBUS.md` (chỉ tài liệu, không sửa mã).
   - Nội dung: luồng code tổng; chuỗi hàm truyền/nhận Modbus (`Device._request_stm32` → `SerialConnection` →
     `_read_done`/`_write_done` → `Device._stm32_received` → `_bench_result` / `Backend._stm32_completed`); cách đặt log

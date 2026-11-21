@@ -34,7 +34,7 @@ def wait(predicate, timeout=4000):
 class RtuFrameTests(unittest.TestCase):
     def test_crc_matches_the_modbus_reference_vector(self):
         # Standard Modbus example "01 03 00 00 00 01 84 0A". The CRC bytes shown
-        # in docs/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md (D5 6E, 84 5C) are not
+        # in docs/nguon/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md (D5 6E, 84 5C) are not
         # valid CRC16 values; the real frames are below.
         self.assertEqual(rtu_adu(1, rtu_request_pdu(3, 0, count=1)).hex(' '), '01 03 00 00 00 01 84 0a')
         self.assertEqual(rtu_adu(9, bytes.fromhex('10 0001 001C')).hex(' '), '09 10 00 01 00 1c 91 48')

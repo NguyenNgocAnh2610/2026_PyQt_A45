@@ -1,13 +1,13 @@
 # Rà soát trước khi chạy trên mạch thật — A45 / 1101K-10
 
 > **Tài liệu tạm** (2026-11-19): báo cáo để người dùng đọc và quyết định trước khi sửa. Sau khi có quyết định, nội dung
-> được chuyển vào `docs/STM32_MODBUS_PC.md` / `PROGRESS.md` rồi xóa file này (như phiếu xác nhận lần trước).
+> được chuyển vào tài liệu 01–07 tương ứng / `PROGRESS.md`; file này giữ làm ảnh chụp ngày 2026-11-19.
 > Chưa sửa mã. Firmware chỉ đọc; mọi thay đổi firmware dưới đây là **đề xuất** để anh/chị tự làm trong bản mới.
 
 Nguồn đã đọc lại:
 - Firmware `ref_AHung\A34_Phao37\Program`: `CPUv1.1 For DK_QDT\Src\main.c`, `Inc\System_Register.h`, `RLMatrixv1.0`,
   `RLMUXv1.0`, `RLPWv1.0`.
-- `docs/BAI_KIEM_TRA_1101K.md`, `configs/a45/*.json`, mã PC (`src/backend.py`, `src/device.py`, `src/protocol.py`).
+- `docs/nguon/BAI_KIEM_TRA_1101K.md`, `configs/a45/*.json`, mã PC (`src/backend.py`, `src/device.py`, `src/protocol.py`).
 
 Phần cứng theo anh/chị:
 - 1 CPU (slave 11, đã thử);
@@ -16,6 +16,31 @@ Phần cứng theo anh/chị:
 - 1 RLPW 12 rơ-le.
 
 ---
+
+## Mục lục
+
+- [0. Kết luận nhanh](#0-kết-luận-nhanh)
+- [1. Phần cứng và firmware thực tế (đã đọc mã)](#1-phần-cứng-và-firmware-thực-tế-đã-đọc-mã)
+- [2. Nhu cầu của 24 bài so với phần cứng](#2-nhu-cầu-của-24-bài-so-với-phần-cứng)
+  - [2.1. Chân phải cấp tín hiệu (13 chân, qua bo matrix)](#21-chân-phải-cấp-tín-hiệu-13-chân-qua-bo-matrix)
+  - [2.2. Điểm đo (18 điểm, qua MUX → ADC)](#22-điểm-đo-18-điểm-qua-mux--adc)
+  - [2.3. Bài nào chạy được với firmware giữ nguyên](#23-bài-nào-chạy-được-với-firmware-giữ-nguyên)
+- [3. Cách mở rộng lên 4 bo matrix](#3-cách-mở-rộng-lên-4-bo-matrix)
+  - [3.1. Hướng A — đổi ID bo matrix (khuyến nghị)](#31-hướng-a--đổi-id-bo-matrix-khuyến-nghị)
+  - [3.2. Hướng B — không sửa firmware nào, dùng "phát UART" của CPUv1.1](#32-hướng-b--không-sửa-firmware-nào-dùng-phát-uart-của-cpuv11)
+  - [3.3. Hướng C — chạy 15/24 ngay, chưa sửa gì](#33-hướng-c--chạy-1524-ngay-chưa-sửa-gì)
+  - [3.4. Bốn bo MUX](#34-bốn-bo-mux)
+- [4. Chu kỳ vòng lặp CPU và an toàn khi chuyển rơ-le (quan trọng)](#4-chu-kỳ-vòng-lặp-cpu-và-an-toàn-khi-chuyển-rơ-le-quan-trọng)
+- [5. Đo lường và kích thích: cần anh/chị xác nhận phần cứng](#5-đo-lường-và-kích-thích-cần-anhchị-xác-nhận-phần-cứng)
+  - [5.1. DAC](#51-dac)
+  - [5.2. ADC](#52-adc)
+  - [5.3. Module đo AC/DC](#53-module-đo-acdc)
+  - [5.4. Xung 10 kHz](#54-xung-10-khz)
+  - [5.5. Rủi ro do firmware CPU, phần mềm PC chỉ giảm nhẹ được](#55-rủi-ro-do-firmware-cpu-phần-mềm-pc-chỉ-giảm-nhẹ-được)
+- [6. Phần mềm PC: đề xuất sửa (chưa làm, chờ duyệt)](#6-phần-mềm-pc-đề-xuất-sửa-chưa-làm-chờ-duyệt)
+- [7. Firmware CPU: đề xuất (anh/chị sửa trong bản mới nếu đồng ý)](#7-firmware-cpu-đề-xuất-anhchị-sửa-trong-bản-mới-nếu-đồng-ý)
+- [8. Quy trình chạy thử đề xuất](#8-quy-trình-chạy-thử-đề-xuất)
+- [9. Câu hỏi cần anh/chị trả lời](#9-câu-hỏi-cần-anhchị-trả-lời)
 
 ## 0. Kết luận nhanh
 
@@ -125,8 +150,8 @@ riêng của từng bài.
 - **Bo RLMatrix:** **chỉ đổi** `#define SLAVE_ADDRESS 0x06` thành `0x07`, `0x08`, `0x09` rồi build ra 3 file hex.
   Không đổi dòng logic nào.
 - **CPU:** thêm 3 lệnh `MBMasterWriteMultiRegister(0x07/0x08/0x09, 0, 2, …)` lấy dữ liệu từ DO 31–36. Mảng
-  `mod_buf_to_write` đã có 50 word nên phải mở rộng struct `Modbus_DO`. Đoạn C mẫu ở `docs/STM32_MODBUS_PC.md`
-  mục 9.9.
+  `mod_buf_to_write` đã có 50 word nên phải mở rộng struct `Modbus_DO`. Đoạn C mẫu ở `docs/04_FIRMWARE_VA_PHAN_CUNG.md`
+  mục 9.
 - **Phần mềm PC:** gần như đã sẵn (`extra_write_registers` Matrix2_0…Matrix4_1). Chỉ còn đổi trạng thái sau khi đo
   kiểm.
 - **Đổi lại:** mỗi bo matrix có lắp tốn thêm khoảng 13 ms mỗi vòng. Nếu đồng thời bỏ 3 khung tới HMI/bo switch không
@@ -173,7 +198,7 @@ Nếu sau này cần: có thể để nhiều bo cùng ID 2 trên bus mà **khô
 ## 4. Chu kỳ vòng lặp CPU và an toàn khi chuyển rơ-le (quan trọng)
 
 Với firmware CPUv1.1 giữ nguyên, ước tính mỗi vòng **L ≈ 360–380 ms**: 300 ms chờ HMI và bo switch không lắp, cộng
-5 × 10 ms `Delay`, cộng các khung có trả lời và phần ADC (`STM32_MODBUS_PC` mục 9.2). D02 sẽ cho số thật.
+5 × 10 ms `Delay`, cộng các khung có trả lời và phần ADC (`04_FIRMWARE_VA_PHAN_CUNG` mục 2). D02 sẽ cho số thật.
 
 | Tham số | Hiện tại | Phải thỏa | Hậu quả nếu sai |
 |---|---|---|---|

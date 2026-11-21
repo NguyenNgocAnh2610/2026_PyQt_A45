@@ -77,7 +77,7 @@
   },
   "stm32_io": {
     "slave": 11,
-    "note": "Giá thử dùng CPUv1.1 For DK_QDT (slave = 8 + công tắc ID = 11), 4 bo RLMatrix 8×4, bo RLMUX 2 kênh × 32, bo RLPW 12 rơ-le; không có bo switch. Bảng đi dây: docs/STM32_MODBUS_PC.md mục 9.10. Mọi mục \"assumed\".",
+    "note": "Giá thử dùng CPUv1.1 For DK_QDT (slave = 8 + công tắc ID = 11), 4 bo RLMatrix 8×4, bo RLMUX 2 kênh × 32, bo RLPW 12 rơ-le; không có bo switch. Bảng đi dây: docs/04_FIRMWARE_VA_PHAN_CUNG.md mục 10. Mọi mục \"assumed\".",
     "extra_write_registers": {
       "Matrix2_0": 31,
       "Matrix2_1": 32,
@@ -86,7 +86,7 @@
       "Matrix4_0": 35,
       "Matrix4_1": 36
     },
-    "extra_write_note": "ĐỀ XUẤT SỬA FW CPU (mục 9.9): mảng mod_buf_to_write của CPUv1.1 có 50 word; index 31–36 còn trống. CPU gửi Matrix2_0/1 → bo ID 7, Matrix3_0/1 → ID 8, Matrix4_0/1 → ID 9 (FC16 reg 0–1) mỗi vòng.",
+    "extra_write_note": "ĐỀ XUẤT SỬA FW CPU (docs/04_FIRMWARE_VA_PHAN_CUNG.md mục 9): mảng mod_buf_to_write của CPUv1.1 có 50 word; index 31–36 còn trống. CPU gửi Matrix2_0/1 → bo ID 7, Matrix3_0/1 → ID 8, Matrix4_0/1 → ID 9 (FC16 reg 0–1) mỗi vòng.",
     "mux_register": "MUX",
     "mux_layout": {
       "banks": 2,

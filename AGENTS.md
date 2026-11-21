@@ -18,17 +18,23 @@ Phát triển **phần mềm giao diện và điều hành giá thử có thể 
 | `AGENTS.md` | Quy tắc và định hướng phát triển lâu dài |
 | `PROGRESS.md` | Hiện trạng, quyết định gần nhất, việc tiếp theo và vấn đề còn mở; nhật ký duy nhất |
 | `README.md` | Cài đặt, chạy ứng dụng, preview và cách sử dụng |
-| `docs/STM32_MODBUS_PC.md` | Tài liệu duy nhất về giao tiếp Modbus RTU PC ↔ STM32: hai mảng, quy tắc giao dịch, bộ chạy bài, simulator; phụ lục A45 v1 cũ |
-| `docs/CONFIGURATION.md` | Tham chiếu schema profile JSON và hiện trạng profile A45 |
-| `docs/CHUYEN_GIA_THU_MOI.md` | Quy trình từng bước chuyển sang giá thử/khối mới; cập nhật khi profile, adapter hoặc tiêu chí đánh giá thay đổi |
-| `docs/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md`, `docs/BAI_KIEM_TRA_1101K.md` | Tài liệu nguồn MCU và yêu cầu đo; **giữ nguyên nội dung**, chỗ hiệu chỉnh ghi ở tài liệu khác |
+| `docs/README.md` | Mục lục tài liệu kỹ thuật, phạm vi từng file, quy ước đặt tên |
+| `docs/01_KIEN_TRUC_PHAN_MEM.md` | Thư mục, các tầng, khởi động, máy trạng thái chạy bài, muốn sửa gì thì vào đâu |
+| `docs/02_GIAO_THUC_MODBUS.md` | Hợp đồng Modbus RTU PC ↔ STM32: khung, hai mảng thanh ghi, mã hóa, quy tắc giao dịch; phụ lục A45 v1 cũ |
+| `docs/03_LUONG_MODBUS_TRONG_CODE.md` | Hàm gửi/nhận, bộ chạy bài, COM ảo, log/debug, tùy biến khung, kiểm thử |
+| `docs/04_FIRMWARE_VA_PHAN_CUNG.md` | Firmware CPU và bo con, chu kỳ vòng lặp, đề xuất sửa firmware, bảng đi dây A45 |
+| `docs/05_VAN_HANH_GIAO_DIEN.md` | Thanh kết nối, bảng thanh ghi, trang Test Modbus, điều kiện chạy mạch thật |
+| `docs/06_CAU_HINH_PROFILE.md` | Tham chiếu schema profile JSON và hiện trạng profile A45 |
+| `docs/07_CHUYEN_GIA_THU_MOI.md` | Quy trình từng bước chuyển sang giá thử/khối mới; cập nhật khi profile, adapter hoặc tiêu chí đánh giá thay đổi |
+| `docs/nguon/` | Tài liệu nguồn MCU và yêu cầu đo; **giữ nguyên nội dung**, chỗ hiệu chỉnh ghi ở tài liệu khác |
+| `docs/bao_cao/` | Báo cáo theo ngày (ảnh chụp tại thời điểm viết); kết luận còn hiệu lực phải chuyển vào 01–07/PROGRESS |
 
-Tổ chức tài liệu: ở gốc repo chỉ giữ `README.md`, `AGENTS.md`, `CLAUDE.md`, `PROGRESS.md`; mọi tài liệu tham khảo đặt trong `docs/`. Mỗi nội dung chỉ nằm ở **một** tài liệu, nơi khác liên kết tới; chỉ sửa tài liệu khi nội dung tương ứng thực sự thay đổi.
+Tổ chức tài liệu: ở gốc repo chỉ giữ `README.md`, `AGENTS.md`, `CLAUDE.md`, `PROGRESS.md`; mọi tài liệu tham khảo đặt trong `docs/` theo quy ước ở `docs/README.md`. Mỗi nội dung chỉ nằm ở **một** tài liệu, nơi khác liên kết tới; chỉ sửa tài liệu khi nội dung tương ứng thực sự thay đổi. Mỗi tài liệu dài có mục lục ở đầu; khi thêm/đổi tiêu đề thì cập nhật mục lục.
 
-Đối chiếu tài liệu với mã đang có trước khi sửa. Nếu các nguồn mâu thuẫn, nêu rõ và cập nhật tài liệu bị lỗi thời khi đã đủ căn cứ; không tự đổi yêu cầu đo/hợp đồng firmware để làm code chạy. Giao thức A45 v1 (phụ lục A của `docs/STM32_MODBUS_PC.md`) chỉ là đề xuất/simulator cũ; không dùng để suy ra giao thức STM32 hiện tại. Mã simulator cũ vẫn có nơi sử dụng, chỉ loại bỏ khi đã thay thế các phụ thuộc và kiểm thử liên quan.
+Đối chiếu tài liệu với mã đang có trước khi sửa. Nếu các nguồn mâu thuẫn, nêu rõ và cập nhật tài liệu bị lỗi thời khi đã đủ căn cứ; không tự đổi yêu cầu đo/hợp đồng firmware để làm code chạy. Giao thức A45 v1 (phụ lục A của `docs/02_GIAO_THUC_MODBUS.md`) chỉ là đề xuất/simulator cũ; không dùng để suy ra giao thức STM32 hiện tại. Mã simulator cũ vẫn có nơi sử dụng, chỉ loại bỏ khi đã thay thế các phụ thuộc và kiểm thử liên quan.
 
 ## Cấu trúc định hướng
-Cấu trúc dưới đây gồm phần đã triển khai và định hướng mở rộng. Hiện chạy bằng `main.py`, Login nằm tại `src/ui/widgets/login_page.py`, preview trong `tests/`. Đã có backend/device/communication/protocol, hai mảng STM32 Modbus RTU, simulator và dashboard QML; chỉ bổ sung module khi có tính năng, không tạo module rỗng. Xem `PROGRESS.md` để biết hiện trạng mới nhất và `docs/STM32_MODBUS_PC.md` khi làm firmware/truyền thông.
+Cấu trúc dưới đây gồm phần đã triển khai và định hướng mở rộng. Hiện chạy bằng `main.py`, Login nằm tại `src/ui/widgets/login_page.py`, preview trong `tests/`. Đã có backend/device/communication/protocol, hai mảng STM32 Modbus RTU, simulator và dashboard QML; chỉ bổ sung module khi có tính năng, không tạo module rỗng. Xem `PROGRESS.md` để biết hiện trạng mới nhất và `docs/02_GIAO_THUC_MODBUS.md` khi làm firmware/truyền thông.
 
 ```text
 2026_PyQt_A45/
@@ -92,7 +98,7 @@ Cấu trúc dưới đây gồm phần đã triển khai và định hướng m�
 - Đổi tên hiển thị không được làm mất dữ liệu cũ: giữ ID, namespace QSettings và định danh lưu phiên ổn định. Không tự đổi `SETTINGS_ORGANIZATION` chỉ vì thấy tên khác A45; nếu cần đổi phải có phương án chuyển dữ liệu.
 
 ## Giao tiếp, mô phỏng và phần cứng thật
-- PC là Master, STM32 CPUv1.0 là Slave USART2, dùng Modbus RTU FC03/06/16. Hai mảng `mod_buf_to_write` và `mod_buf_to_read` độc lập; cùng địa chỉ không có nghĩa là đọc lại giá trị vừa ghi. Kích thước/enum ở `src/common/stm32.py`, hợp đồng chi tiết ở `docs/STM32_MODBUS_PC.md`.
+- PC là Master, STM32 CPUv1.0 là Slave USART2, dùng Modbus RTU FC03/06/16. Hai mảng `mod_buf_to_write` và `mod_buf_to_read` độc lập; cùng địa chỉ không có nghĩa là đọc lại giá trị vừa ghi. Kích thước/enum ở `src/common/stm32.py`, hợp đồng chi tiết ở `docs/02_GIAO_THUC_MODBUS.md`.
 - Mảng ghi là bản nháp yêu cầu; chụp dữ liệu khi gửi. ACK chỉ xác nhận giao dịch nhận lệnh, không tự copy sang mảng đọc hoặc xác nhận đầu ra. Không tự ghi cả mảng zero, gửi lại lệnh encoder hoặc gửi bản nháp khi mở COM/đổi nguồn/kết nối lại.
 - Mở COM, slave trả lời, dữ liệu hợp lệ và thiết bị sẵn sàng chạy bài là các trạng thái khác nhau. Hủy phản hồi trễ của phiên/nguồn cũ; mất cáp, đổi thiết bị/ID hoặc hết hạn phải vô hiệu hóa trạng thái hiện thời. Khi thêm polling chỉ đọc, tuần tự hóa với thao tác ghi và dừng có kiểm soát.
 - Byte order, signed/unsigned, scale, bitfield, địa chỉ zero-based và timeout phải có định nghĩa rõ và test không cần mạch. Qt xử lý khung/CRC RTU của đường thật; không bọc giao thức A45 v1 cũ vào MCU hiện tại. Nếu MCU chưa cung cấp timestamp, chiều dài RX hay xác nhận hoàn thành thì giữ là chưa biết, không tự suy ra.

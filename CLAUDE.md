@@ -46,7 +46,7 @@ conda run -n qt_env python -m tests.preview_main --state modbus     # trang Test
   - PC chỉ nói chuyện với CPU: `Backend.check_cpu_slave()` từ chối mọi request stm32 tới slave khác `stm32_io.slave`; bo con chỉ điều khiển bằng thanh ghi CPU (`CpuMap.forwards` ghi CPU gửi tiếp tới bo nào).
   - Trang Test Modbus (`src/ui/widgets/modbus_test.py`) gọi `Backend.tool_*`: hàng đợi ghi một giao dịch/lần, dùng chung `Stm32IoMap` (liên động, ngắt trước đóng sau, MUX < 32), lỗi → ảnh DO "chưa biết".
   - Mỗi bài: FC03 → safe_state (Mode=1 trước) → chuẩn bị → ghi diff DO từng bước (vừa nhả vừa đóng rơ-le thì ngắt trước, chờ `break_ms`, rồi đóng) → chờ → ghi MUX (số kênh) → FC03 → giải mã → so dung sai → safe_state. Input `manual` hỏi người vận hành (`Backend.manual_request`/`submit_manual`, bỏ trống = giá trị chuẩn có nhãn "mặc định, chưa đo").
-  - Ánh xạ A45 là bảng phân bổ để đi dây (`docs/STM32_MODBUS_PC.md` mục 9.10): rơ-le nguồn RLPW là output `bit`, mọi chân XP1 (cả lệnh mức) đi qua 4 bo RLMatrix (`matrix_boards`, output `pin`). Bo ID 6 dùng `Matrix0/1`; bo ID 7–9 dùng `Matrix2_0…Matrix4_1` (index 31–36) là **đề xuất sửa firmware**, khai báo trong `extra_write_registers`. Không gán output vào `hmi_forced_bits`. Không có bo switch.
+  - Ánh xạ A45 là bảng phân bổ để đi dây (`docs/04_FIRMWARE_VA_PHAN_CUNG.md` mục 10): rơ-le nguồn RLPW là output `bit`, mọi chân XP1 (cả lệnh mức) đi qua 4 bo RLMatrix (`matrix_boards`, output `pin`). Bo ID 6 dùng `Matrix0/1`; bo ID 7–9 dùng `Matrix2_0…Matrix4_1` (index 31–36) là **đề xuất sửa firmware**, khai báo trong `extra_write_registers`. Không gán output vào `hmi_forced_bits`. Không có bo switch.
   - Runner không bao giờ ghi DataO1/DataO2 (encoder tự xóa), DataO3, CDT/DataT, index 0 (`BENCH_WRITABLE` + thanh ghi mở rộng của profile).
   - ACK chỉ là biên nhận, không xác nhận đầu ra. Lỗi giữa chừng → ERROR, ảnh DO thành "chưa biết", không tự ghi lại.
   - Tín hiệu `unsupported` trong `stm32_io` làm bài BLOCKED trước khi gửi gì.
@@ -58,12 +58,16 @@ conda run -n qt_env python -m tests.preview_main --state modbus     # trang Test
 - Bộ chạy bài chạy trên COM ảo và COM thật có cổng chặn; `production_ready=false`. Mọi mục trong `stm32_io` là `assumed` nên trên mạch thật hiện chỉ tự kiểm tra chạy được. Các điểm phải kiểm khi lên mạch thật nằm trong `PROGRESS.md`, mục "Cần kiểm khi lên phần cứng thật".
 - Chỉ đổi `status` thành `verified` sau khi đã đo kiểm thật. Không tự đổi giao thức/địa chỉ/baudrate, không tự điền dung sai để có PASS.
 - Tài liệu (mỗi nội dung chỉ ở một nơi; gốc repo chỉ có README/AGENTS/CLAUDE/PROGRESS):
-  - `docs/LUONG_CODE_VA_MODBUS.md`: luồng code tổng và chuỗi hàm truyền/nhận Modbus, log/debug, tùy biến khung (cho người tự sửa code; cập nhật khi đổi tên/luồng hàm).
-  - `docs/STM32_MODBUS_PC.md`: giao tiếp Modbus duy nhất, phụ lục A là A45 v1 cũ.
-  - `docs/CONFIGURATION.md`: schema.
-  - `docs/CHUYEN_GIA_THU_MOI.md`: quy trình chuyển giá thử; người dùng muốn tài liệu này được bổ sung dần mỗi khi profile/adapter/tiêu chí thay đổi.
-  - Mã nguồn firmware (chỉ đọc, ngoài repo): `D:\project\2026_DT_Chinh\ref\ref_AHung\A34_Phao37\Program\` → `CPUv1.0`, `CPUv1.1 For DK_QDT` (đang dùng), `RLMatrixv1.0`, `RLMUXv1.0`, `RLPWv1.0`; phân tích ở `docs/STM32_MODBUS_PC.md` mục 3.1, 9, 9.11; đề xuất sửa firmware mục 9.9.
-  - Tài liệu nguồn giữ nguyên nội dung: `docs/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md` (firmware CPUv1.0 của giá thử cũ, để tham khảo) và `docs/BAI_KIEM_TRA_1101K.md` (24 bài đo thật).
+  - `docs/README.md`: mục lục, quy ước đặt tên (`NN_TEN.md` theo thứ tự đọc; `nguon/` giữ nguyên; `bao_cao/YYYY-MM-DD_TEN.md`). Mỗi file dài có `## Mục lục` ở đầu, cập nhật khi đổi tiêu đề.
+  - `01_KIEN_TRUC_PHAN_MEM.md`: tầng, khởi động, máy trạng thái, "muốn sửa X thì vào đâu" (cập nhật khi đổi tên/luồng hàm).
+  - `02_GIAO_THUC_MODBUS.md`: hợp đồng Modbus PC ↔ CPU (khung, hai mảng, mã hóa, quy tắc giao dịch, CRC); phụ lục A là A45 v1 cũ.
+  - `03_LUONG_MODBUS_TRONG_CODE.md`: hàm gửi/nhận, bộ chạy bài, COM ảo, log/debug, tùy biến khung, kiểm thử.
+  - `04_FIRMWARE_VA_PHAN_CUNG.md`: firmware CPU/bo con (mục 1–8, 11), đề xuất sửa firmware (mục 9), bảng đi dây A45 (mục 10).
+  - `05_VAN_HANH_GIAO_DIEN.md`: thanh kết nối, bảng thanh ghi, trang Test Modbus, điều kiện chạy mạch thật.
+  - `06_CAU_HINH_PROFILE.md`: schema.
+  - `07_CHUYEN_GIA_THU_MOI.md`: quy trình chuyển giá thử; người dùng muốn tài liệu này được bổ sung dần mỗi khi profile/adapter/tiêu chí thay đổi.
+  - Mã nguồn firmware (chỉ đọc, ngoài repo): `D:\project\2026_DT_Chinh\ref\ref_AHung\A34_Phao37\Program\` → `CPUv1.0`, `CPUv1.1 For DK_QDT` (đang dùng), `RLMatrixv1.0`, `RLMUXv1.0`, `RLPWv1.0`.
+  - Tài liệu nguồn giữ nguyên nội dung: `docs/nguon/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md` (firmware CPUv1.0 của giá thử cũ, để tham khảo) và `docs/nguon/BAI_KIEM_TRA_1101K.md` (24 bài đo thật).
 - Style Qt Widgets: `assets/styles/common.qss` nạp ở cấp `QApplication` qua `src/common/styles.py`; QSS trang chỉ ghi đè phần riêng, chọn bằng `objectName`/dynamic property.
 
 

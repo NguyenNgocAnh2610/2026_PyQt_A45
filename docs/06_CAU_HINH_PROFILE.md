@@ -1,8 +1,23 @@
 # Cấu hình profile giá thử (tham chiếu schema)
 
 Tài liệu tham chiếu **duy nhất** cho các trường JSON của một profile. Quy trình
-từng bước khi tạo giá thử mới: [CHUYEN_GIA_THU_MOI.md](CHUYEN_GIA_THU_MOI.md).
-Ý nghĩa thanh ghi STM32: [STM32_MODBUS_PC.md](STM32_MODBUS_PC.md).
+từng bước khi tạo giá thử mới: [07 Chuyển giá thử](07_CHUYEN_GIA_THU_MOI.md).
+Ý nghĩa thanh ghi STM32: [02 Giao thức](02_GIAO_THUC_MODBUS.md).
+
+## Mục lục
+
+- [Tổng quan](#tổng-quan)
+- [system.json](#systemjson)
+  - [Tín hiệu (`signals[]`)](#tín-hiệu-signals)
+  - [`monitor_channels[]`](#monitor_channels)
+- [File đối tượng (bài và bước)](#file-đối-tượng-bài-và-bước)
+  - [`sequences`](#sequences)
+  - [Bài (`tests[]`)](#bài-tests)
+  - [Bước (`steps[]`)](#bước-steps)
+- [hardware.json](#hardwarejson)
+  - [`stm32_io`](#stm32_io)
+- [mock.json](#mockjson)
+- [Hiện trạng profile A45 / khối 1101K-10](#hiện-trạng-profile-a45--khối-1101k-10)
 
 ## Tổng quan
 
@@ -215,7 +230,7 @@ không chép dải tiêu chuẩn để tạo PASS.
 
 ## Hiện trạng profile A45 / khối 1101K-10
 
-Tài liệu nguồn: [BAI_KIEM_TRA_1101K.md](BAI_KIEM_TRA_1101K.md). Các điểm chưa đủ đặc tả
+Tài liệu nguồn: [nguon/BAI_KIEM_TRA_1101K.md](nguon/BAI_KIEM_TRA_1101K.md). Các điểm chưa đủ đặc tả
 đã được người dùng chốt tạm ngày 2026-11-18 (phiếu xác nhận); giá trị tạm ghi ở `basis`
 của từng check, điểm còn nghi vấn ở `notes` của bài. Không còn `issues`.
 
@@ -233,7 +248,7 @@ của từng check, điểm còn nghi vấn ở `notes` của bài. Không còn 
 Chạy tự động mô phỏng: **24/24 PASS** (bỏ trống tần số thì ghi "có giá trị mặc định
 chưa đo"). PASS mô phỏng không có nghĩa bài sẵn sàng chạy phần cứng: ánh xạ
 `stm32_io` (CPUv1.1 slave 11, 4 bo matrix, bảng phân bổ để đi dây ở
-`docs/STM32_MODBUS_PC.md` mục 9.10) và trình tự `sequences` vẫn là giả định; bo matrix
+[04 Firmware](04_FIRMWARE_VA_PHAN_CUNG.md) mục 10) và trình tự `sequences` vẫn là giả định; bo matrix
 ID 7–9 cần sửa firmware CPU và bo con. Tự kiểm tra: D01 truyền thông (ghi có ACK +
 FC03), D02 chu kỳ vòng lặp CPU, D03 chưa định nghĩa (BLOCKED). Trên COM thật: tự kiểm
 tra chạy được; bài đo bị chặn cho tới khi các mục nó dùng được đổi `verified`.

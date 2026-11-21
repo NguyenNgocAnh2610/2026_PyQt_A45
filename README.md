@@ -14,12 +14,7 @@ kiểm từng rơ-le/kênh.
 |---|---|
 | [AGENTS.md](AGENTS.md) | Quy tắc phát triển bắt buộc (kiến trúc, an toàn giao tiếp, backup, quy trình) |
 | [PROGRESS.md](PROGRESS.md) | Hiện trạng, việc tiếp theo, vấn đề mở — nhật ký duy nhất |
-| [docs/LUONG_CODE_VA_MODBUS.md](docs/LUONG_CODE_VA_MODBUS.md) | Luồng code tổng; hàm truyền/nhận Modbus; cách đặt log, debug, tùy biến khung |
-| [docs/STM32_MODBUS_PC.md](docs/STM32_MODBUS_PC.md) | Giao tiếp Modbus RTU với STM32: hai mảng, quy tắc giao dịch, bộ chạy bài, simulator |
-| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Tham chiếu schema profile JSON |
-| [docs/CHUYEN_GIA_THU_MOI.md](docs/CHUYEN_GIA_THU_MOI.md) | Quy trình chuyển sang giá thử mới |
-| [docs/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md](docs/PHAN_TICH_GIAO_THUC_VA_LUONG_CODE.md) | Tài liệu nguồn: phân tích mã firmware MCU (giữ nguyên) |
-| [docs/BAI_KIEM_TRA_1101K.md](docs/BAI_KIEM_TRA_1101K.md) | Tài liệu nguồn: các bài kiểm tra khối 1101K-10 |
+| [docs/README.md](docs/README.md) | **Mục lục tài liệu kỹ thuật** (01–07, tài liệu nguồn, báo cáo) và thứ tự đọc theo vai trò |
 
 Nguyên tắc: mỗi nội dung chỉ nằm ở **một** tài liệu, các tài liệu khác liên kết tới.
 
@@ -49,7 +44,7 @@ Nếu shell không activate được, dùng `conda run -n qt_env python ...`.
 - **Modbus RTU** → chọn COM, baudrate → Kết nối: mở COM thật, phần mềm tự đọc một FC03 tới
   CPU (slave theo profile, A45 = 11). Có trả lời → **"Sẵn sàng · COM THẬT"**; không trả lời →
   "Không có phản hồi STM32 (slave N)" kèm gợi ý (công tắc ID trên bo CPU, dây A/B, baud).
-  **UART** chỉ mở cổng serial thuần. Hướng dẫn: [STM32_MODBUS_PC.md mục 6](docs/STM32_MODBUS_PC.md#6-sử-dụng-trên-giao-diện-chẩn-đoán).
+  **UART** chỉ mở cổng serial thuần. Hướng dẫn: [05 Vận hành mục 1](docs/05_VAN_HANH_GIAO_DIEN.md#1-kết-nối-và-bảng-hai-mảng-thanh-ghi).
 - "Đã mở COM" chỉ là đã mở cổng, chưa xác nhận slave trả lời.
 
 ### Chạy trên mạch thật
@@ -57,14 +52,14 @@ Nếu shell không activate được, dùng `conda run -n qt_env python ...`.
   "Sẵn sàng · COM THẬT", sau hộp thoại xác nhận; chỉ ghi trạng thái an toàn (mọi rơ-le nhả).
 - **Bài đo** chỉ chạy khi mọi ánh xạ bài dùng đã `verified` trong `hardware.json`, D02 đạt
   trên kết nối đó, và người vận hành xác nhận. Thiếu điều kiện nào thì hộp thoại liệt kê rõ.
-  Thời gian chờ trên mạch thật không bị chia hệ số mô phỏng. Chi tiết: [STM32_MODBUS_PC.md mục 10](docs/STM32_MODBUS_PC.md).
+  Thời gian chờ trên mạch thật không bị chia hệ số mô phỏng. Chi tiết: [05 Vận hành mục 3](docs/05_VAN_HANH_GIAO_DIEN.md).
 
 ### Test Modbus
 Mục **⇄ Test Modbus** trên thanh bên: lấy quyền điều khiển CPU (Mode=1), bật/tắt từng rơ-le
 nguồn, nối chân qua lưới matrix 8×4 của từng bo, chọn kênh MUX rồi đọc ADC, đặt DAC/DOUT,
 nút **Về an toàn**, bảng thanh ghi thô (tự đọc định kỳ) và nhật ký khung TX/RX xuất ra file.
 Dùng chung luật an toàn với bộ chạy bài (liên động, ngắt trước đóng sau, chặn kênh MUX ≥ 32).
-Thử trước trên COM ảo. Chi tiết: [STM32_MODBUS_PC.md mục 6.1](docs/STM32_MODBUS_PC.md).
+Thử trước trên COM ảo. Chi tiết: [05 Vận hành mục 2](docs/05_VAN_HANH_GIAO_DIEN.md).
 
 ### Chạy bài
 1. Nhập serial khối (không cần với tự kiểm tra), chọn chế độ: **Tự kiểm tra giá thử**,
@@ -83,7 +78,7 @@ Kết quả: PASS, FAIL, ERROR (lỗi giao tiếp/mẫu), BLOCKED (thiếu đặ
 cứng chưa đáp ứng), SKIPPED (bài phụ thuộc chưa PASS), ABORTED, Tạm dừng (lần
 chạy bị tạm dừng, đã chạy lại). Profile A45 hiện
 cho **24/24 PASS mô phỏng** với ánh xạ phần cứng giả định
-(chi tiết: [CONFIGURATION.md](docs/CONFIGURATION.md#hiện-trạng-profile-a45--khối-1101k-10)).
+(chi tiết: [06_CAU_HINH_PROFILE.md](docs/06_CAU_HINH_PROFILE.md#hiện-trạng-profile-a45--khối-1101k-10)).
 
 **Nhập tay**: số đo bằng thiết bị ngoài (ví dụ tần số 3 pha ở P01, đo bằng oxilo)
 hiện hộp thoại khi tới bước đó; đầu ra vẫn giữ nguyên trong lúc đo. Để trống hoặc
@@ -134,7 +129,7 @@ ghi cài đặt người dùng.
 - `src/ui/`: `main_window.py`, `widgets/` (Login, thanh kết nối, hai mảng STM32, đồ thị), `qml/SignalDashboard.qml`.
 - `src/backend.py`: trạng thái duy nhất và bộ chạy bài; `src/device.py`, `src/protocol.py`,
   `src/communication.py`, `src/simulator.py`: thiết bị, codec, I/O serial, giả lập
-  (xem [STM32_MODBUS_PC.md](docs/STM32_MODBUS_PC.md)).
+  (xem [02 Giao thức](docs/02_GIAO_THUC_MODBUS.md)).
 - `src/common/`: cấu hình, profile/validator, bản đồ STM32, model, style. `src/storage.py`: lưu phiên.
 - `configs/<gia_thu>/`: profile JSON. `tests/`: test tự động và preview.
 
